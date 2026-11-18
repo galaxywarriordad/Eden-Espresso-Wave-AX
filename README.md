@@ -25,13 +25,14 @@ This project pioneers the path toward a dedicated, bare-metal gaming appliance, 
 * **Upstream Ecosystem Hub:** [Eden Community Website](https://git.eden-emu.dev/eden-emu/eden/)
 
 ## 📚 Documentation & Architecture Specifications
-* [Unified Dual-Target Master Plan (v1.2)](UNIFIED_MASTER_PLAN.md)[cite: 2]
-* [Windows Architecture Specification (v1.34)](ARCHITECTURE_SPEC.md)[cite: 2]
-* [Linux Appliance Specification (v0.5)](EDEN_PICCOLO_SPEC.md)[cite: 2]
-* [User & Architecture Guide (v1.34)](USER_GUIDE.md)[cite: 2]
-* [Additional Technical Details (v1.34)](ADDITIONAL_DETAILS.md)[cite: 2]
-* [What's Next (v1.34 / v1.35)](WhatsNext.md)[cite: 2]
-* [Benchmark & Architectural Assessment](Benchmark_Assessment.md) — [View on Forgejo Server](https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX/src/branch/master/Benchmark_Assessment.md)
+* [Unified Dual-Target Master Plan (v1.2)](docs/espresso/UNIFIED_MASTER_PLAN.md)
+* [Windows Architecture Specification (v1.34)](docs/espresso/ARCHITECTURE_SPEC.md)
+* [Linux Appliance Specification (v0.5)](docs/picollo/EDEN_PICCOLO_SPEC.md)
+* [User & Architecture Guide (v1.34)](docs/espresso/USER_GUIDE.md)
+* [Additional Technical Details (v1.34)](docs/espresso/ADDITIONAL_DETAILS.md)
+* [What's Next (v1.34 / v1.35)](docs/espresso/WhatsNext.md)
+* [Benchmark & Architectural Assessment](docs/espresso/Benchmark_Assessment.md)
+* [Ecosystem Topology](docs/ecosystem/ecosystem_topology.md)
 
 ---
 
