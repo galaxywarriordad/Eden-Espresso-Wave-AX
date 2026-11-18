@@ -20,7 +20,7 @@ Vision:
 This project pioneers the path toward a dedicated, bare-metal gaming appliance, exemplified by Eden Piccolo [AX], a fully optimized Linux USB boot environment delivering near-zero latency and consistent sub-millisecond frame pacing.
 ## 🔗 Official Repository Network
 * **Main Development Repository:** [Eden Forgejo Server](https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX.git)
-* **Sister Mirror Repository:** [GitHub Mirror Portal](https://github.com/galaxywarriordad/Eden-Espresso-Wave-AX)
+* **Sister Mirror Repository:** [GitHub Mirror Portal](https://github.com/galaxywarriordad/Eden-Espresso-Wave-AX.git)
 * **Upstream Ecosystem Hub:** [Eden Community Website](https://git.eden-emu.dev/eden-emu/eden/)
 
 ## 📚 Documentation & Architecture Specifications
