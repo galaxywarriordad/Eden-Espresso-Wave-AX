@@ -1,4 +1,4 @@
-## ☕ Eden Espresso Wave [AX] — Master v1.34 / v1.35 Ready
+# ☕ Eden Espresso Wave [AX] — Master v1.34 / v1.35 Ready
 
 A deterministic, hardware-locked fork of the Eden Nintendo Switch Emulator engineered for Intel Coffee Lake Refresh, NVIDIA Maxwell/Pascal GPUs, Intel Quick Sync Video, and bit-perfect exclusive USB DAC audio.
 Eden Espresso Wave [AX] — Elevating Nintendo Switch Emulation to Professional Hardware Parity
