@@ -1,0 +1,232 @@
+# 🗺️ Eden Emulator: Comprehensive Architectural Specification (Master v1.34)
+
+Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, & Global Microarchitectural Dependency Matrix  
+**Updated:** 2026-11-16 (Post-Shader Macro Harmonization & Pipeline Telemetry Sprint)
+
+**Hardware Baseline:** Intel Core i5-9600K (6 Physical Cores / 6 Hardware Threads / Zero SMT — $x48$ / 4.8 GHz locked symmetrically across all cores, 9 MB L3 Smart Cache) + NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200) + Intel UHD Graphics 630 iGPU (Vendor `0x8086`) + HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
+
+**Target Platforms:** Windows 10/11 Desktop Host (`PGO_stage0LD.bat` $\rightarrow$ `PGO_stage1.bat` $\rightarrow$ `PGO_stage2.bat`) & Eden Piccolo [AX] ($< 300\text{ MB}$ toram EROFS `PREEMPT_RT` Batocera USB Appliance)
+
+**Storage Topology:**
+* **NVMe #1:** OS + `eden.exe` + Vulkan Shader Cache
+* **NVMe #2:** $< 200\text{ MB}$ Updates & DLCs
+* **7200 RPM SATA HDD:** Level-18 Block-Compressed `.chd` / `.ncz` Main Game Images
+
+---
+
+## 📑 Table of Contents
+
+* [Section 1: Unified Macro Data-Flow, PGO Workspace Automation, & Host Runtime Topology](#section-1-unified-macro-data-flow-pgo-workspace-automation--host-runtime-topology)
+* [Section 2: Host Memory Virtualization, GMMU Page Translation, & Cache-Coherency Tracking](#section-2-host-memory-virtualization-gmmu-page-translation--cache-coherency-tracking)
+* [Section 3: Asynchronous CPU Execution, Fiber Thread Dispatching, & Temporal Pacing](#section-3-asynchronous-cpu-execution-fiber-thread-dispatching--temporal-pacing)
+* [Section 4: Real-Time Audio Scheduling, Graph Compilation, & FlexASIO Silicon Offloading](#section-4-real-time-audio-scheduling-graph-compilation--flexasio-silicon-offloading)
+* [Section 5: Real-Time Video, Telemetry OSD, Storage/Shader Quarantine, GTX 980 Ti Texture Compression Policy, & Telemetry](#section-5-real-time-video-telemetry-osd-storageshader-quarantine-gtx-980-ti-texture-compression-policy--telemetry)
+* [Section 6: Consolidated Upstream PR Triage & Silicon Adaptation Matrix](#section-6-consolidated-upstream-pr-triage--silicon-adaptation-matrix)
+* [Section 7: Expanded 6-Phase Linear Engineering Roadmap](#section-7-expanded-6-phase-linear-engineering-roadmap)
+
+---
+
+## 🌐 Section 1: Unified Macro Data-Flow, PGO Workspace Automation, & Host Runtime Topology
+
+```text
+========================================================================================================================
+                   EDEN ESPRESSO WAVE [AX] v1.34 ELASTIC 2:3:1 NON-SMT + STORAGE-AWARE TOPOLOGY
+========================================================================================================================
+
+  [ BATCH GENERATION CONTROL ]      [ DEVELOPER INFRASTRUCTURE ]       [ ASYNC THREAD ENGINE ]    [ SILICON PRESENTATION ]
+  
+  PGO_stage0LD / 1 / 2.bat            CMakeLists.txt (Externals)          Core::DeviceMemory      NVIDIA GTX 980 Ti (dGPU)
+                │                               │                              │ (512GB Reserve)     (Vulkan Graphic Pipes)
+                ▼                               ▼                              ▼                            ▲
+       chcp 65001 (UTF-8 Stream)      Policy CMP0169 Gate enforced     Core::Memory::Memory                 │ Mask: 0x02
+                │                               │                      (_bextr_u64 3-Arg BMI1)              │ (Core 1)
+                ▼                               ▼                      (SeLockMemoryPrivilege)              │
+      Intelligent Delta Triage        FetchContent_Declare(asio_sdk)           │                            │
+      Purges Stale Engine Handles               │                              ▼                            │
+                │                               ▼                      GPUDirtyMemoryManager ───────► [ Vulkan Core ]
+                ▼                     Parse Flat Root Steinberg SDK            │                      - VulkanWorker Ring
+  Scripts\check_hardware.ps1           From audiosdk/asio.git                  ▼                      - Pinned: Core 1 (0x02)
+  (Live Root Menu IRQ Audit)                    │                      Tegra::GMMU Manager            - GTX 980 Ti IRQ: 0x02
+                │                               ▼                      (Coalesced Range-Locks)        - Page-Guarded UBO Stream
+                ▼                     Export Target: asio::asio                │                      - Maxwell 64/128/256MB Tiers
+  Scripts\macro_update.ps1                      │                              ▼
+  + Scripts\shader_validate.ps1                 ▼                      Core::CpuManager
+  (GLSL 460 + glslangValidator)       target_link_libraries()          (Config-Driven 2:3:1 Scaler)
+                │                     (Pure Win32 + QSV; No CUDA)      (eden_engine.ini / topology)
+                ▼                               │                              │
+       High-Velocity Compiler Pass ─────────────┘                              │
+     (clang-cl 23.1.4 + ThinLTO)                                               │
+                │                                                              │
+                ▼                                                              │
+  Scripts\telemetry_daemon.ps1 ─────────────────┬──────────────────────────────┘
+  (Async JSON Regression Gate)                  │
+       ┌────────────────────────────────────────┼────────────────────────────────────────┐
+       ▼                                        ▼                                        ▼
+[ AUXILIARY QUARANTINE: CORE 5 ]     [ PRIMARY GUEST JIT: CORES 2–4 ]         [ AUDIO CORE INTERCONNECT ]
+- Mask: 0x20 (Quarantine Sink)       - Mask: 0x1C (Home-Biased Fibers)        - AudioCore::AudioCore Coordinator
+- Guest Core 3 (Normal | 0x3C Spill)   - Guest ARM Cores 0–2 (High Priority)               │
+- Main GUI / Input Thread (Normal)     - Home Bias: C0►0x04, C1►0x08, C2►0x10    ┌─────────┴─────────┐
+- CHD / ScopedNczQuarantine (BelowN)   - Shielded from CHD/Shaders/QSV/IRQs      ▼                   ▼
+- QSVVideoFeeder (BelowNormal)                                          [ AudioManager ]     [ SystemManager ]
+- PipelineWorkerPoolRing x1 (Low)                                       (Lock-Free Atomics)  (MMCSS / SCHED_FIFO 99)
+- AVX2 ZSTD Cache Decomp (Non-Temp)                                              │                   │
+- Storage IRQs: SATA AHCI + NVMe x2 (0x20)                                       ▼                   ▼
+       │                                                                [ AudioCore::Event ] [ CommandGenerator ]
+       ▼                                                                (std::ranges Check)  (Polymorphic Layouts)
+[ REAL-TIME VIDEO SUBSYSTEM ]                                                   │                   │
+- Tegra::Host1x::Host1x Engine                                                   ▼                   ▼
+       │                                                                [ Sink Endpoints ]   [ CommandBuffer ]
+ ┌─────┴─────┐                                                          - FlexASIO / ALSA    - std::construct_at
+ ▼           ▼                                                          (Direct Exclusive)   - 0xCAFEBABE Magic
+[ Vic ]  [ Tegra::Nvdec ]                                               - WASAPI / hw:FC3    - Time Estimator
+(Inline) (Naked Variant Tables)                                         - Cubeb Secondary    - Hardened Biquad (PR #2)
+ │           │                                                                   │                   │
+ ▼           ▼                                                                   └─────────┬─────────┘
+[Raster] [ ::Tegra::Decoder ]                                                              ▼
+ │           │                                                                  Host Core 0 Loop (Mask: 0x01)
+ │     ┌─────┴─────┐                                                            - 4.8 GHz BIOS x48 Lock
+ │     ▼           ▼                                                            - HostTiming (High | 0x20 Fallback)
+ │ codecs/vp9  codecs/vp8                                                       - HiBy FC3 USB xHCI IRQ: 0x01
+ │ (Intel QSV) (Intel QSV)                                                                 │
+ │     │           │                                                                       ▼
+ │     └─────┬─────┘                                                            [ HiBy FC3 USB DAC ]
+ │           ▼                                                                  (ESS ES9281AC Pro Clock)
+ └──► Intel UHD 630 iGPU (Vendor 0x8086)
+      (NT Shared Handle / VA-API DMA-BUF | QSVVideoFeeder: Core 5 / 0x20)
+```
+
+### ⚙️ Telemetry Build System & Host Silicon Execution Blueprint
+
+* **The Character Encoding Firewall & Workspace Purge (`PGO_stage0LD.bat` & `clean_all.bat`):** Forces the host context interpreter straight into `chcp 65001` (UTF-8 Code Page Mode), preserving Unicode structure tags of the medium-shade coffee liquid asset (`▒`) without character dropping or line buffer splitting. Terminates active build engine processes, clears telemetry metrics logs, purges internal binary tracking manifests, and launches an asynchronous multi-threaded PowerShell disk deletion worker prior to running `clang-cl 23.1.4` via Ninja.
+* **Integrated PGO Stage Quality Gates (`PGO_stage0LD.bat`, `PGO_stage1.bat`, `PGO_stage2.bat`):** All PGO stage batch scripts invoke `Scripts\macro_update.ps1`, `Scripts\shader_validate.ps1`, and `Scripts\telemetry_daemon.ps1` regression checks between cleaning and compilation/baking steps. PowerShell invocations use scoped inline `-ExecutionPolicy Bypass` flags, and batch conditional blocks avoid nested multi-line `else` syntax hazards via explicit error-level checks and `setlocal EnableDelayedExpansion`.
+* **Interactive Root Configurator Menu:** Queries and renders live IRQ affinity audit results sourced from `Scripts\check_hardware.ps1` directly inside the CLI menu to verify system readiness before launching builds or sweeps.
+* **The Modernised Externals Ingestion Gateway & Pure Win32 Linker Isolation (`CMakeLists.txt`, `externals/CMakeLists.txt`, `src/common/CMakeLists.txt`):** Declares dependency mappings via `FetchContent_Declare` and runs population checks inside `FetchContent_MakeAvailable(asio_sdk)` to comply with CMake 4.5+ Policy `CMP0169`, mapping the flat root structure of the Steinberg ASIO SDK.
+* **v1.34 Linker & Runtime Alignment:** Updates platform libraries and CRT flags to purge unused stubs, isolates hardware workarounds behind runtime capability feature flags (`eden_engine.ini`), and enforces strict header ordering, guard macros, and scope enum registrations.
+* **Config-Driven 2:3:1 Physical-Core Partitioning & Process-Validated Affinity (`eden_engine.ini`):** Defaults to exact `0x01`/`0x02`/`0x1C`/`0x20` masks on the Intel Core i5-9600K while supporting a lightweight startup scaler (`EnableProportionalScaler=true`) that reads `2:3:1` ratios from `[EngineTopology]` and scales proportionally across physical P-cores on 8/12/16-core CPUs without work-stealing jitter.
+* **1:1 PCIe/USB/SATA Hardware IRQ Steering:** Configures static IRQ steering (`Scripts\set_irq_affinity.ps1`) with a process-scoped reversible runtime MSI IRQ helper (`Scripts\irq_runtime_helper.ps1`).
+
+---
+
+## 🗃️ Section 2: Host Memory Virtualization, GMMU Page Translation, & Cache-Coherency Tracking
+
+**Component Cluster:** `bmi_util.h`, `device_memory.h/.cpp`, `device_memory_manager.h/.cpp`, `gpu_dirty_memory_manager.h`, `memory.h/.cpp`
+
+### 🔍 Microarchitectural Status Vetting & Technical Reality
+
+* **Linear Contiguous Address Space (`Core::DeviceMemory`):** Reserves a 512 GB contiguous virtual memory space (`VirtualReserveSize = 1ULL << 39`) inside the host OS environment during standard recompiler execution. Guest application memory addresses map linearly to host pointers via plain pointer offsets, bypassing expensive map lookups, hash checks, or dynamic vector indirection loops.
+* **Large-Page / HugeTLB Backing (`EnableLockMemoryPrivilege` & `ax_platform_shim.hpp`):** Queries `OpenProcessToken` and `LookupPrivilegeValue(nullptr, SE_LOCK_MEMORY_NAME, &luid)` during `Memory::Impl` construction on Windows to enable `SeLockMemoryPrivilege`, and maps $6 \times 1\text{G}$ (6.0 GB) $+ 1024 \times 2\text{M}$ (2.0 GB) `MAP_HUGETLB` + `mlockall()` arenas on Eden Piccolo [AX], minimizing Skylake DTLB misses across guest address ranges.
+* **Single-Cycle 3-Argument BMI1 Intrinsic Translation (`bmi_util.h` & `memory.cpp`):** Inside `Common::BitUtils::ExtractBitField`, `GetPointerFromRasterizerCachedMemory`, and `GetPointerFromDebugMemory`, page-index extraction invokes the explicit 3-argument Coffee Lake BMI1 intrinsic `_bextr_u64(vaddr, static_cast<u8>(YUZU_PAGEBITS), 36)` (`HAS_BMI1 = 1` under `-march=skylake`). This compiles directly to the single-cycle x86-64 `BEXTR` instruction.
+* **Split-Path GMMU Page Table Resolution (`Core::DeviceMemoryManager`):** Hooks the backing store directly into graphics page table layers to accommodate games that alias a single physical texture buffer or vertex array across multiple distinct virtual address handles (`MULTI_FLAG` mode redirects multi-aliased textures to a dedicated `MultiAddressContainer` chain).
+* **Lock-Free Weak-CAS Dirty Tracking (`Core::GPUDirtyMemoryManager::Collect`):** Packs the page address and sub-page modification bitmask into a single 8-byte `TransformAddress` and applies a lock-free weak Compare-And-Swap loop (`compare_exchange_weak` with `std::memory_order_acq_rel`), allowing parallel execution threads to merge dirty snapshots with zero thread-scheduling latency.
+* **Hardware Bit-Scan Coherency Extraction (`Gather()`):** Executed directly on Core 1 (`0x02`) alongside Vulkan command submission. Swaps internal collection array pointers instantly (`front_buffer.swap(back_buffer)`), then processes snapshots using C++20 bit-manipulation primitives (`std::countr_zero` / `std::countr_one` / `ClearLowestSetBit` $\rightarrow$ `TZCNT` / `BLSR`) to extract continuous dirty byte lengths in a few clock cycles.
+
+---
+
+## ⏱️ Section 3: Asynchronous CPU Execution, Fiber Thread Dispatching, & Temporal Pacing
+
+**Component Cluster:** `core_timing.h/.cpp`, `cpu_manager.h/.cpp`, `speed_limiter.h/.cpp`
+
+### 🔍 Microarchitectural Status Vetting & Technical Reality
+
+* **User-Mode Fiber Context Switching (`Core::CpuManager`):** Maps emulated ARM cores onto host processor tracks using User-Mode Fibers (`Common::Fiber` via `PhysicalCore::RunThread` and `KInterruptManager::HandleInterrupt`), eliminating OS kernel-mode context switches and keeping host CPU instruction caches populated.
+* **Home-Biased Elastic 2:3:1 Guest Scheduling (`Core::CpuManager::RunThread`):**
+  * **Guest ARM Cores 0–2 (`PrimaryGuestJit = 0x1C` / `ThreadPriority::High`):** Scheduled inside a home-biased `Common::Fiber` pool with 1:1 ideal-processor affinity biasing (Guest Core 0 $\rightarrow$ Core 2 `0x04`, Guest Core 1 $\rightarrow$ Core 3 `0x08`, Guest Core 2 $\rightarrow$ Core 4 `0x10`) before stealing across `0x1C`. Preserves private 32 KB L1d and 256 KB L2 caches while remaining 100% shielded from `.chd`/`.ncz` decompression, shaders, QSV/VA-API, and storage IRQs.
+  * **Guest ARM Core 3 (`ElasticGuestPool = 0x3C` / `ThreadPriority::Normal`):** Biased to Core 5 (`0x20`) via `SetCurrentThreadIdealProcessor(5)` to run lightweight Horizon OS services, while retaining `0x3C` elastic spillover onto Cores 2–4 so cross-core IPC never stalls during SATA AHCI + Level-18 decompression bursts.
+* **Lock-Free Single-Core Preemption & Sequentially Consistent Page-Table Fences (`PreemptSingleCore` & `Memory::SetCurrentPageTable`):** Rotates `current_core` via a lock-free Compare-And-Swap loop, anchors single-core workloads onto Host Core 2 (`SingleCoreJit = 0x04`), and enforces `std::atomic_thread_fence(std::memory_order_seq_cst)` barriers across page-table transitions.
+* **$O(1)$ Amortized Fibonacci Heap Timeline (`Core::Timing::CoreTiming`):** Stores scheduled sub-device callbacks inside a Boost Fibonacci Heap (`heap_t`), providing $O(1)$ amortized complexity for insertions and key updates.
+* **Deterministic Core 0 Yielding & Symmetrical Clock Execution:** Pins `HostTiming` to Core 0 (`TimingAndAudio = 0x01`) at `ThreadPriority::High` under a locked 4.8 GHz frequency baseline. This structurally eliminates cross-core multiplier-step adjustments during fiber handoffs to the primary JIT pool (`0x1C`). It deterministically yields to the Critical MMCSS / `SCHED_FIFO 99` audio engine, synchronised through `std::scoped_lock lock{advance_lock, basic_lock}` to eliminate lock-order inversion deadlocks.
+* **Hybrid High-Resolution Frame Pacing (`SpeedLimiter`, `timeBeginPeriod(1)` & `clock_nanosleep`):** Invokes `timeBeginPeriod(1)` on `Initialize` and pairs `CreateWaitableTimerExW` (or `clock_nanosleep` `TIMER_ABSTIME` on Piccolo) down to $\sim 1.2\text{ ms}$ before target presentation with a `_mm_pause()` spin-wait tail for $< 1\text{ µs}$ frametime delivery.
+
+---
+
+## 🔊 Section 4: Real-Time Audio Scheduling, Graph Compilation, & FlexASIO / ALSA Silicon Offloading
+
+**Component Cluster:** `audio_core.h/.cpp`, `audio_manager.h/.cpp`, `audio_event.h/.cpp`, `audio_render_manager.h/.cpp`, `system_manager.h/.cpp`, `system.h/.cpp`, `command_generator.h/.cpp`, `command_buffer.h/.cpp`, `command_processing_time_estimator.h/.cpp`, `decoder.h/.cpp`, `decoder_manager.h/.cpp`, `hardware_opus.h/.cpp`, `flex_asio_manager.hpp/.cpp`, `lockfree_audio_queue.hpp`, `cubeb_sink.cpp`
+
+### 🔍 Microarchitectural Status Vetting & Technical Reality
+
+* **Inline Cache-Local Instantiation (`AudioCore::AudioCore`):** Instantiates `AudioManager` and the ADSP microkernel inline via `std::optional` to maintain strict L1/L2 cache locality on Host Core 0, operating at a stable 4.8 GHz BIOS x48 baseline. This guarantees absolute timing uniformity across zero-heap graph compilation sequences.
+* **MMCSS Pro Audio / `SCHED_FIFO 99` Preemption Guard & Voice-Drop Telemetry (`AudioCore::Renderer::SystemManager`):** Pins `AudioRenderSystemManager` onto Core 0 (`TimingAndAudio = 0x01`) at `ThreadPriority::Critical` wrapped in `ScopedProAudio` (`AvSetMmThreadCharacteristicsW` / `SCHED_FIFO` priority 99), monitoring renderer voice-drop pressure alongside sink-level `g_metrics.audio_underruns`.
+* **Cross-Core Lock-Free PCM Ring Buffer (`lockfree_audio_queue.hpp`):** Streams raw PCM samples generated by the JIT recompiler on Cores 2–5 over to Core 0 via a cache-line-aligned (`alignas(64)`) atomic ring buffer (`RING_CAPACITY = 2048`) with Acquire-Release semantics inside a tight 128-sample (2.67 ms Windows) / 96-frame (2.00 ms Piccolo ALSA) window.
+* **Primary Direct Hardware Path + Secondary Cubeb Fallback:**
+  * **Windows Primary Path:** Provisions valid TOML profiles across root, `src\`, and user profile paths (`wasapiExclusiveMode = true`, `bufferSizeSamples = 128`), routing bit-perfect PCM over USB xHCI (IRQ `0x01`) directly to the ESS Sabre ES9281AC Pro clock inside your HiBy FC3 USB DAC.
+  * **Piccolo Linux Primary Path:** Opens direct exclusive `hw:CARD=FC3,DEV=0` (`S32_LE`, 48 kHz, 96 frames $\times$ 2 periods / 2.00 ms) with PipeWire and PulseAudio excised from the rootfs.
+  * **Secondary Fallback:** Retains `CubebSink` as an automatic failover endpoint on desktop Windows if the primary ASIO driver is busy or unavailable.
+* **Zero-Heap Graph Compilation & Cache-Aligned `HardwareOpus`:** Carves memory spans via `WorkbufferAllocator::Allocate<T>` with C++20 `std::construct_at`; injects `CommandMagic = 0xCAFEBABE`; uses polynomial time estimation (`ICommandProcessingTimeEstimator`) with priority voice dropping; and aligns `HardwareOpus` mailboxes to 64-byte cache lines.
+
+---
+
+## 🎬 Section 5: Real-Time Video, Telemetry OSD, Storage/Shader Quarantine, GTX 980 Ti Texture Compression Policy, & Telemetry
+
+**Component Cluster:** `vk_scheduler.cpp`, `telemetry_osd.cpp/.h`, `vk_pipeline_worker.h/.cpp`, `vk_pipeline_cache.cpp`, `vk_cache_decompression.cpp`, `vk_ubo_passthrough.h/.cpp`, `vk_texture_cache.cpp`, `texture_cache.h`, `image_base.cpp`, `vulkan_device.cpp`, `vk_swapchain.h/.cpp`, `ncz_decompressor.cpp`, `vp8.h/.cpp`, `vp9.h/.cpp`, `codec_types.h`, `nvdec.h`, `qsv_decoder.h/.cpp`, `vaapi_dmabuf_bridge.hpp`, `perf_stats.h/.cpp`, `reporter.h/.cpp`, `shared_translation.cpp`, `main.cpp`, `Scripts\macro_update.ps1`, `Scripts\shader_validate.ps1`, `Scripts\telemetry_daemon.ps1`
+
+### 🔍 Microarchitectural Status Vetting & Technical Reality
+
+* **Automated Shader Macro Harmonization & Pre-Build SPIR-V Validation (`Scripts\macro_update.ps1` & `Scripts\shader_validate.ps1`):** Enforces explicit numeric macro defines (`USE_EASU`, `USE_RCAS`, `YUZU_USE_FP16`, `VERSION`) across all shader wrappers, standardises all GLSL headers to `#version 460 core` with `#extension GL_GOOGLE_include_directive`, and runs `glslangValidator` pre-build checks to catch Vulkan SPIR-V validation errors before C++ compilation.
+* **Asynchronous Per-Core Telemetry Daemon (`Scripts\telemetry_daemon.ps1`):** Runs out-of-process with configurable polling intervals and graceful shutdown controls to profile `eden.exe` per core, logging memory working sets, thread affinity compliance, and initial audio buffer health watermarks as structured JSON for automated build-stage regression checks.
+* **Native Vulkan Telemetry OSD & SPIR-V Pipeline:** Integrates real-time RAM working set and commit memory monitoring via Win32 `psapi` directly into the engine render loop. Renders text overlays using compiled binary SPIR-V font shaders (`font.vert.spv`, `font.frag.spv`) through custom Graphics Pipeline State Objects (PSOs) with alpha blending and dynamic vertex quad generation.
+* **Vulkan Query Pools & Pipeline Statistics:** Leverages native `VK_QUERY_TYPE_PIPELINE_STATISTICS` query pools to track vertex, primitive, and shader invocation metrics asynchronously without stalling the GPU command stream.
+* **Dedicated Vulkan Command Submission Ring & Zero-Allocation Descriptors:** Locks `VulkanWorker` onto Core 1 (`VulkanSubmit = 0x02`) at `ThreadPriority::VeryHigh` alongside the 1:1 GTX 980 Ti MSI interrupt (`0x02`) on its dedicated 4.8 GHz pipeline, routing uniform updates through `DescriptorUpdateManager` (`vkCreateDescriptorUpdateTemplate`).
+* **Maxwell GM200 / Pascal Protection:**
+  * Speculative 5.50 GB DXGI VRAM Shield (`vk_rasterizer.cpp`).
+  * Enforces `maxPushDescriptors` hardware ceilings with safe null-descriptor fallbacks on slot overflow.
+  * Clamps `VkImageSubresourceRange` mip/layer counts prior to `vkCreateImageView` and validates sub-buffer alignment limits within `vk_ubo_passthrough.cpp` to eliminate `VK_ERROR_DEVICE_LOST` faults.
+  * Calibrated 3D compute unswizzle tiers (`gpu_unswizzle_max_texture_size`: 64/128/256 MiB, `stream_size`: 8/16/32 MiB, `chunk_size`: 64/128/256 slices).
+* **Storage & Auxiliary Quarantine Hierarchy on Core 5 (`0x20`):**
+  * **Level-18 `.chd` & `ScopedNczQuarantine` Decompression (`ncz_decompressor.cpp` — `BelowNormal`):** Temporarily migrates ZSTD decompression threads onto Core 5 (`0x20`) at `THREAD_PRIORITY_BELOW_NORMAL`.
+  * **Single-Worker SPIR-V Shader Compiler Ring (`vk_pipeline_worker.h/.cpp` & `vk_pipeline_cache.cpp` — `Low`):** Enforces `ASYNC_WORKER_CORE_CLAMP = 1` strictly on `0x20` (Core 5) with `WaitForRequests` drain synchronisation and 32-byte aligned AVX2 non-temporal pipeline cache decompression.
+  * **Main GUI / Controller Input Loop (`main.cpp` — `Normal`):** Pins the Win32 message pump and controller polling loop to Core 5 (`0x20`).
+* **GTX 980 Ti Texture Compression & Hybrid Policy (Option C — Active + Roadmap Target):**
+  * **Why Compression Policy Matters on Maxwell GM200:** The GTX 980 Ti (6 GB GDDR5) lacks native hardware ASTC decoding. Decoding ASTC into Uncompressed (`RGBA8`) preserves 100% lossless visuals but expands VRAM footprint by $4\times\text{--}16\times$, risking breaches of your 5.50 GB VRAM ceiling.
+  * **Active Option C Hybrid Runtime Policy:** Keep ASTC Recompression set to Uncompressed (`RGBA8`) for titles staying under $\sim 4.5\text{ GB}$ VRAM; switch to BC3 only on VRAM-heavy titles or when running $2\times$/$3\times$ resolution scaling.
+  * **Roadmap Target (Phase 3):** Add hardware-native BC7 (`VK_FORMAT_BC7_UNORM_BLOCK`) and BC6H (`VK_FORMAT_BC6H_UFLOAT_BLOCK` for HDR skyboxes).
+* **Intel UHD 630 Silicon Offloading:** Offloads H.264/HEVC/VP8/VP9 decoding onto the Intel UHD Graphics 630 iGPU via Windows COM `IDXGIResource1` NT Shared Handles or Piccolo `intel-media-driver` VA-API planar NV12 `dma_buf` FDs.
+
+---
+
+## 📦 Section 6: Consolidated Upstream PR Triage & Silicon Adaptation Matrix
+
+| Upstream PR | Source | Target Phase | Architectural Integration & Silicon Rationale |
+| :--- | :--- | :--- | :--- |
+| **Eden PR #4819 & #4210** | Eden | Phase 1 | 64-bit CityHash pipeline key condensation & bit-packed 32-bit `FixedPipelineState`—compresses state dictionary lookups into Skylake L1/L2 caches. |
+| **Eden PR #4664** | Eden | Phase 1 | Validates reverting multi-threaded async shader races (`#2560`)—enforces `ASYNC_WORKER_CORE_CLAMP = 1` strictly on Core 5 (`0x20`) with a runtime fallback toggle (`async_shader_worker_enabled`). |
+| **Eden PR #4668, #3817 & #2** | Eden | Phase 1 | Sizes `heap_tracker` virtual memory budgets from actual mapping counts alongside `SeLockMemoryPrivilege` (`#4668`/`#3817`); adds coefficient bounds checks to `BiquadFilterEffectCommand` on Core 0 (`0x01`) to prevent `SIGSEGV` faults (`#2`). |
+| **Citron PR #4688, #449, #383** | Citron / Neo | Phase 2 | Hardcodes GTX 980 Ti `maxPushDescriptors` cap with null-descriptor fallbacks (`#4688`) and guards `vk_ubo_passthrough` / `dma_ring_bridge` against non-contiguous physical page DMA transfers (`#449`) and sub-aligned buffer ranges (`#383`). |
+| **Citron PR #448** | Citron Neo | Phase 2 | Short-circuits index estimation in `vk_rasterizer.cpp` / `maxwell_3d.cpp` for procedural vertex-less draws (`gl_VertexIndex` / `SV_VertexID`) on Core 1 (`0x02`). |
+| **Citron PR #447 & #385** | Citron Neo | Phase 2 & 3 | Clamps `VkImageSubresourceRange` mip/layer bounds in `vk_texture_cache.cpp` (`#385`) and validates SPIR-V descriptor types (`#447`) to prevent Maxwell GM200 `VK_ERROR_DEVICE_LOST` faults. |
+| **Citron PR #4966, #5311, #5102** | Citron | Phase 3 | Injects formatless image bitmask validation (`#4966`) for Maxwell GM200 and routes async query cache recycling onto the Core 5 (`0x20`) worker ring during VBLANK (`#5102` / `#5311`). |
+| **Eden PR #32** | Eden | Phase 3 | Uses CPU address deltas in `texture_cache.h` for overlap invalidation decisions—cutting false-positive `GPUDirtyMemoryManager` flushes on Core 1 (`0x02`) and reducing 6 GB VRAM churn. |
+
+---
+
+## 🗺️ Section 7: Expanded 6-Phase Linear Engineering Roadmap
+
+### 🎨 Phase 1: Compiler Stability, Core Partitioning & Instrumentation Foundation (`v1.33` $\rightarrow$ `v1.34`)
+* **Focus:** Stabilise execution timing, enforce cache-sticky core partitioning, harden Core 0/5 boundaries, automate shader macro normalization/SPIR-V validation, and deploy live per-core telemetry before attempting advanced GPU concurrency.
+* **File Footprint:** `CMakeLists.txt`, `eden_engine.ini`, `PGO_stage0LD.bat`, `PGO_stage1.bat`, `PGO_stage2.bat`, `Scripts\macro_update.ps1`, `Scripts\shader_validate.ps1`, `Scripts\telemetry_daemon.ps1`, `src/common/thread.h/.cpp`, `src/common/bmi_util.h`, `src/common/settings_enums.h`, `src/core/cpu_manager.cpp`, `src/core/core_timing.cpp`, `src/core/memory.cpp`, `src/core/crypto/ncz_decompressor.cpp`, `src/audio_core/renderer/system_manager.cpp`, `src/video_core/renderer_vulkan/vk_pipeline_worker.h/.cpp`, `vk_pipeline_cache.cpp`, `vk_cache_decompression.cpp`, `src/video_core/host1x/codecs/` (`nvdec.h`, `vp8.cpp`, `vp9.cpp`)
+* **Key Activities:** Elastic `2:3:1` core partitioning across uniform 4.8 GHz clock blocks, single-worker Core 5 shader pool & FFmpeg slice quarantine, audio biquad coefficient hardening, upstream hash condensation, numeric shader macro harmonization (`macro_update.ps1`), pre-build `glslangValidator` checks (`shader_validate.ps1`), and async JSON telemetry profiling (`telemetry_daemon.ps1`).
+
+### 🎨 Phase 2: Descriptor Throughput, Contiguity Safety & Math Acceleration (`v1.34`)
+* **Focus:** Maximise GPU/CPU arithmetic execution speed, harden Core 0 resampling math, and eliminate CPU-side descriptor pool validation overhead on Core 1 (`0x02`) without compromising Maxwell GM200 memory safety.
+* **File Footprint:** `src/video_core/macro/macro.h/.cpp`, `macro_jit_compiler.h/.cpp`, `src/video_core/engines/maxwell_3d.cpp`, `src/video_core/renderer_vulkan/vk_rasterizer.cpp`, `vk_ubo_passthrough.h/.cpp`, `vk_update_descriptor.h/.cpp`, `vk_texture_cache.cpp`, `emit_spirv.cpp`, `dma_ring_bridge.h/.cpp`, `src/audio_core/sink/flex_asio_manager.cpp`
+* **Key Activities:** Spatially partitioned macro-JIT core, page-contiguity-guarded push descriptor streams, zero-vertex-stream procedural draw fastpath, and Maxwell image view range clamping.
+
+### 🎨 Phase 3: VRAM Boundaries, Config-Driven Scaling & High-Fidelity BC7/BC6H Compression (`v1.35`)
+* **Focus:** Enforce deterministic memory ceilings within the GTX 980 Ti's 6 GB VRAM budget, enable config-driven `2:3:1` core scaling with runtime hardware capability flags, introduce Eden Piccolo Linux shims, and upgrade texture formats to near-lossless BC7 and BC6H.
+* **File Footprint:** `vk_rasterizer.cpp`, `vk_vram_shield.hpp`, `texture_cache.*`, `astc_to_bc7.comp`, `ax_platform_shim.hpp`, `eden_engine.ini`, `topology.ini`, `vk_device.cpp`, `vulkan_device.h`
+* **Key Activities:** Speculative VRAM over-subscription shield, fragment-aware VRAM texture reaper, high-fidelity BC7/BC6H compression, CPU-delta overlap resolution, and config-driven symmetrical core scaler logic.
+
+### 🎨 Phase 4: Async Concurrency, Cross-Silicon Offloading & Reversible IRQ Steering (`v1.36`)
+* **Focus:** Leverage parallel hardware pipelines (GTX 980 Ti Async Compute, Intel UHD 630 iGPU, WinRT WGC / `lsfg-vk 2.0.0+`, and Vulkan Video Decode) without PCIe bottlenecks, and replace manual Windows registry modifications with a reversible runtime MSI IRQ helper.
+* **File Footprint:** `vk_device.h/.cpp`, `vk_async_compute.hpp`, `vk_staging_buffer_pool.cpp`, `vk_synchronization2.hpp`, `vk_memory_manager.cpp`, `vk_wgc_capture.cpp`, `qsv_decoder.h/.cpp`, `vaapi_dmabuf_bridge.hpp`, `Scripts\irq_runtime_helper.ps1`
+* **Key Activities:** Zero-copy WinRT WGC capture, Vulkan asynchronous compute, insulated Intel UHD 630 QSV / VA-API bridge, and reversible runtime MSI IRQ helper targeted to flat 4.8 GHz profiles.
+
+### 🎨 Phase 5: Closed-Loop Telemetry, Predictive Storage Pre-Faulting & Production Appliance (`v1.37`)
+* **Focus:** Eliminate mechanical HDD seek stalls, cut input-to-photon latency, prevent Maxwell shader register spilling, enable zero-overhead hardware capture, and ship the production Eden Piccolo [AX] `v1.0` appliance.
+* **File Footprint:** `vfs_prefetch_ring.h/.cpp`, `ncz_decompressor.cpp`, `core_timing.cpp`, `speed_limiter.h/.cpp`, `raw_hid_poller.h/.cpp`, `emit_spirv.cpp`, `vk_wgc_capture.cpp`, `devkit_telemetry_display.py`, `verify_ax_appliance.sh`
+* **Key Activities:** Predictive HDD-to-NVMe block pre-faulting ring, closed-loop thermal & frame-pacing governor calibrated for symmetrical thread frequencies, Maxwell register-pressure guard, and Core 5 direct USB HID poller / production appliance bake.
+
+### 🎨 Phase 6: Blue-Sky Autonomous Silicon & Neural Runtime (`v2.00` — Forward-Looking R&D)
+* **Focus:** Transform the emulator from a static translator into a self-recompiling, zero-latency hardware appliance using live superblock re-compilation, hardware optical flow on the idle Intel UHD 630 iGPU, and custom USB microcontroller hardware interrupts.
+* **File Footprint:** `live_reopt_daemon.h/.cpp`, `igpu_optical_flow.h/.cpp`, `vfs_predictive_migrator.h/.cpp`, `firmware/usb_sync_bridge/`
+* **Key Activities:** Live background superblock re-compilation, cross-silicon VME optical flow motion vector synthesis, custom USB microcontroller VBLANK & audio clock-sync dongle, and predictive NVMe #2 whole-title hot-migration.

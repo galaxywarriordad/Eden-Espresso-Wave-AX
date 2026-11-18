@@ -1,0 +1,25 @@
+# ================================================================================
+# EDEN EMULATOR HI-FI SINK: HARDWARE-LINKED TO HIBY FC3 ESS SABRE SILICON
+# ================================================================================
+
+# Force the PortAudio driver subsystem to route via Windows WASAPI
+backend = "Windows WASAPI"
+
+# 128 samples @ 48 kHz = 2.67 ms deterministic buffer window (Core 0 MMCSS Protected)
+bufferSizeSamples = 128
+
+[input]
+# Disable the input system entirely to prevent floating polling thread overhead
+device = ""
+suggestedLatencySeconds = 0.0
+
+[output]
+# Match this string character-for-character to your Windows Playback endpoint
+device = "Speakers (HiBy FC3)"
+
+# Enforce Bit-Perfect Zero-Copy hardware passthrough to bypass the Windows Engine
+wasapiExclusiveMode = true
+wasapiAutoConvert = false
+suggestedLatencySeconds = 0.0
+channels = 2
+```[cite: 1]
