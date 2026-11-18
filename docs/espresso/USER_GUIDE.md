@@ -1,19 +1,19 @@
 # 📘 Eden Espresso Wave [AX] — User & Operational Guide (Master v1.34 / v1.35)
 
-Operational, build automation, calibration, and troubleshooting manual for the Eden Espresso Wave [AX] engine and Eden Piccolo [AX] appliance.
+Operational, build automation, calibration, and troubleshooting manual for the **Eden Espresso Wave [AX]** engine and **Eden Piccolo [AX]** appliance.
 
 ---
 
 ## 📑 Table of Contents
 
-* [Section 1: Project Overview, Engineering Philosophy, and Target Silicon](#section-1-project-overview-engineering-philosophy-and-target-silicon)
-* [Section 2: System Prerequisites, Hardware Steering, First-Boot Calibration & PGO Training Protocol](#section-2-system-prerequisites-hardware-steering-first-boot-calibration--pgo-training-protocol)
-* [Section 3: Runtime Silicon Topology & Architectural Summary](#section-3-runtime-silicon-topology--architectural-summary)
-* [Section 4: Development Roadmap & Future Silicon Milestones](#section-4-development-roadmap--future-silicon-milestones)
-* [Section 5: Optimal Driver, Engine & FlexASIO Runtime Configuration](#section-5-optimal-driver-engine--flexasio-runtime-configuration)
-* [Section 6: Cross-Platform Performance Benchmarks & Troubleshooting Reference](#section-6-cross-platform-performance-benchmarks--troubleshooting-reference)
-* [Section 7: Build Toolchain Prerequisites, Pipeline Process Overview, Telemetry Diagnostics & Troubleshooting](#section-7-build-toolchain-prerequisites-pipeline-process-overview-telemetry-diagnostics--troubleshooting)
-* [Section 8: Closing Reflections, Acknowledgements & The Road Ahead](#section-8-closing-reflections-acknowledgements--the-road-ahead)
+* [Section 1: Project Overview, Engineering Philosophy, and Target Silicon](#️-section-1-project-overview-engineering-philosophy-and-target-silicon)
+* [Section 2: System Prerequisites, Hardware Steering, First-Boot Calibration & PGO Training Protocol](#️-section-2-system-prerequisites-hardware-steering-first-boot-calibration--pgo-training-protocol)
+* [Section 3: Runtime Silicon Topology & Architectural Summary](#-section-3-runtime-silicon-topology--architectural-summary)
+* [Section 4: Development Roadmap & Future Silicon Milestones](#️-section-4-development-roadmap--future-silicon-milestones)
+* [Section 5: Optimal Driver, Engine & FlexASIO Runtime Configuration](#️-section-5-optimal-driver-engine--flexasio-runtime-configuration)
+* [Section 6: Cross-Platform Performance Benchmarks & Troubleshooting Reference](#-section-6-cross-platform-performance-benchmarks--troubleshooting-reference)
+* [Section 7: Build Toolchain Prerequisites, Pipeline Process Overview, Telemetry Diagnostics & Troubleshooting](#️-section-7-build-toolchain-prerequisites-pipeline-process-overview-telemetry-diagnostics--troubleshooting)
+* [Section 8: Closing Reflections, Acknowledgements & The Road Ahead](#-section-8-closing-reflections-acknowledgements--the-road-ahead)
 
 ---
 
@@ -21,7 +21,7 @@ Operational, build automation, calibration, and troubleshooting manual for the E
 
 ### 🎯 1.1 What This Project Is
 
-**Eden Espresso Wave [AX] (Master v1.34)** is a custom, hardware-locked fork of the Eden Nintendo Switch Emulator compiled from source to partition system silicon into dedicated lanes for audio, Vulkan rendering, guest ARM64 JIT, and auxiliary background tasks—sharing a unified C++20 silicon core with the **Eden Piccolo [AX]** ($< 300\text{ MB}$ toram Batocera USB 3.0) appliance.
+**Eden Espresso Wave [AX] (Master v1.34)** is a custom, hardware-locked fork of the Eden Nintendo Switch Emulator compiled from source to partition system silicon into dedicated lanes for audio, Vulkan rendering, guest ARM64 JIT, and auxiliary background tasks—sharing a unified C++20 silicon core with the **Eden Piccolo [AX]** ($< 300\text{ MB}$ `toram` Batocera USB 3.0) appliance.
 
 ### 🧠 1.2 Why We Are Building It This Way
 
@@ -56,7 +56,7 @@ While calibrated for the i5-9600K + GTX 980 Ti + UHD 630 + HiBy FC3 baseline, it
 To run `eden.exe` at peak performance on the Master v1.34 binary, configure your system with the following BIOS and Windows settings:
 * **BIOS Per-Core Multiplier Overclock (Intel Core i5-9600K):** Configure core ratios (All Cores set to $x48$ / 4.8 GHz, Uncore Ring to $x43\text{--}x44$ / 4.3–4.4 GHz, AVX Offset 0) and manage power states (disable C-States / SpeedStep if hunting micro-stutters) to safeguard real-time audio deadlines.
 * **Intel UHD Graphics 630 iGPU & DVMT Pre-Allocation:** Enable *IGFX Multi-Monitor* and assign 256 MB–512 MB DVMT Pre-Allocated memory for Intel Quick Sync Video (QSV) hardware video decoding.
-* **Windows Large-Page Privilege (`SeLockMemoryPrivilege`):** Open `secpol.msc` $\rightarrow$ *Local Policies* $\rightarrow$ *User Rights Assignment* $\rightarrow$ *Lock pages in memory*, add your Windows user account, and reboot. To verify via an Administrator Command Prompt, run `whoami /priv | findstr /i "SeLockMemoryPrivilege"`. Note that Windows displays the privilege state as `Disabled` by default in `whoami /priv`—as long as the row appears in the output, your account holds the token right and `eden.exe` enables it programmatically at startup to allocate 2 MB Windows Large Pages and reduce Skylake DTLB misses.
+* **Windows Large-Page Privilege (`SeLockMemoryPrivilege`):** Open `secpol.msc` → *Local Policies* → *User Rights Assignment* → *Lock pages in memory*, add your Windows user account, and reboot. To verify via an Administrator Command Prompt, run `whoami /priv | findstr /i "SeLockMemoryPrivilege"`. Note that Windows displays the privilege state as `Disabled` by default in `whoami /priv`—as long as the row appears in the output, your account holds the token right and `eden.exe` enables it programmatically at startup to allocate 2 MB Windows Large Pages and reduce Skylake DTLB misses.
 * **1:1 PCIe / USB / SATA Hardware IRQ Steering:** Run `Scripts\set_irq_affinity.ps1` (as Administrator) and reboot, then verify with `Scripts\check_hardware.ps1` that hardware interrupts map cleanly across CPU cores (`0x01` USB xHCI Audio, `0x02` GTX 980 Ti Vulkan, `0x20` NVMe/SATA AHCI Quarantine) to prevent `storahci.sys` DPC audio underruns.
 
 ### 🎛️ 2.2 First-Boot Emulator & Audio Calibration (Stage 0 Verification)
@@ -66,7 +66,7 @@ To run `eden.exe` at peak performance on the Master v1.34 binary, configure your
 
 ### 🚀 2.3 Profile-Guided Optimisation (PGO) Build & Training Protocol via Master Configurator Hub
 
-The 3-stage LLVM PGO pipeline is driven by the unified **`PGO_configurator.bat`** master hub (`PGO_stage0LD.bat` $\rightarrow$ `PGO_stage1.bat` $\rightarrow$ `Scripts\validate_profile.ps1` $\rightarrow$ `PGO_stage2.bat`), linearising hot execution paths into the i5-9600K's 32 KB L1i cache via an instrumented build, `%APPDATA%\eden` environment sandboxing, 3 $\times$ 15-minute gameplay telemetry sweeps, and final ThinLTO production binary compilation.
+The 3-stage LLVM PGO pipeline is driven by the unified **`PGO_configurator.bat`** master hub (`PGO_stage0LD.bat` → `PGO_stage1.bat` → `Scripts\validate_profile.ps1` → `PGO_stage2.bat`), linearising hot execution paths into the i5-9600K's 32 KB L1i cache via an instrumented build, `%APPDATA%\eden` environment sandboxing, $3 \times 15$-minute gameplay telemetry sweeps, and final ThinLTO production binary compilation.
 
 ---
 
@@ -79,8 +79,8 @@ The Eden Espresso Wave [AX] (Master v1.34) runtime allocates the 6-core non-SMT 
 ### 🏛️ 3.2 Architectural Summary
 * **Core 0 (`0x01` @ 4.8 GHz):** Manages dedicated audio and master clock lanes, isolating `AudioRenderSystemManager` (Critical MMCSS) and `HostTiming` (High) alongside steered HiBy FC3 USB xHCI interrupts (`0x01`) for bit-perfect PCM streaming and rock-solid frame pacing.
 * **Core 1 (`0x02` @ 4.8 GHz):** Dedicated to an un-evicted Vulkan submission lane, pairing `VulkanWorker` (VeryHigh) and `GPUDirtyMemoryManager::Gather()` with GTX 980 Ti MSI interrupts (`0x02`) to maintain high minimum FPS in draw-call-heavy scenes.
-* **Cores 2–4 (`0x1C` @ 4.8 GHz):** Houses the cache-sticky guest ARM64 JIT block using home-biased `Common::Fiber` workers (C0 $\rightarrow$ `0x04`, C1 $\rightarrow$ `0x08`, C2 $\rightarrow$ `0x10`), single-cycle BMI1 `_bextr_u64` page walks, and 2 MB Large Page fastmem translation.
-* **Core 5 (`0x20` @ 4.8 GHz):** Acts as an auxiliary and offload quarantine sink for background tasks—Guest Core 3 (`0x3C` spillover), Main GUI/Input, `ScopedNczQuarantine` (ZSTD L18 decompression), single-worker SPIR-V compilation ($x1$), `QSVVideoFeeder`, and steered SATA AHCI + NVMe IRQs (`0x20`)—keeping rendering lanes clear.
+* **Cores 2–4 (`0x1C` @ 4.8 GHz):** Houses the cache-sticky guest ARM64 JIT block using home-biased `Common::Fiber` workers (`C0` → `0x04`, `C1` → `0x08`, `C2` → `0x10`), single-cycle BMI1 `_bextr_u64` page walks, and 2 MB Large Page fastmem translation.
+* **Core 5 (`0x20` @ 4.8 GHz):** Acts as an auxiliary and offload quarantine sink for background tasks—Guest Core 3 (`0x3C` spillover), Main GUI/Input, `ScopedNczQuarantine` (ZSTD L18 decompression), single-worker SPIR-V compilation ($\times 1$), `QSVVideoFeeder`, and steered SATA AHCI + NVMe IRQs (`0x20`)—keeping rendering lanes clear.
 
 ---
 
@@ -88,7 +88,7 @@ The Eden Espresso Wave [AX] (Master v1.34) runtime allocates the 6-core non-SMT 
 
 ### 📈 4.1 6-Phase Linear Engineering Progression
 
-Eden Espresso Wave [AX] (Master v1.34) follows a strict, six-phase engineering roadmap—moving from deterministic CPU core partitioning and PGO code layout up to hardware BC7/BC6H texture compression, zero-copy multi-GPU compute, predictive HDD-to-NVMe streaming, and live background superblock re-compilation.
+Eden Espresso Wave [AX] (Master v1.34) follows a strict, six-phase engineering roadmap—moving from deterministic CPU core partitioning and PGO code layout up to hardware BC7/BC6H texture compression, zero-copy multi-GPU compute, predictive HDD-to-NVMe streaming, and live background superblock re-compilation:
 
 ```text
 [ PHASE 1: COMPILER & CORE ] ──► [ PHASE 2: THROUGHPUT & MATH ] ──► [ PHASE 3: VRAM & BC7/BC6H ]
@@ -100,9 +100,9 @@ Eden Espresso Wave [AX] (Master v1.34) follows a strict, six-phase engineering r
 
 ### 🎯 4.2 Phase-by-Phase Milestone Overview & In-Game Impact
 
-* **🎨 Phase 1: Compiler Stability, Core Partitioning & Instrumentation Foundation (`v1.33` $\rightarrow$ `v1.34`)**
+* **🎨 Phase 1: Compiler Stability, Core Partitioning & Instrumentation Foundation (`v1.33` → `v1.34`)**
   * *Core Engineering Focus:* Locks the Elastic 2:3:1 Non-SMT Topology (`0x01` Core 0 Audio/Timing @ 4.8 GHz, `0x02` Core 1 Vulkan, `0x1C` Cores 2–4 Home-Biased Guest JIT, `0x20` Core 5 Quarantine Sink), enforces a single Core 5 SPIR-V shader worker (`ASYNC_WORKER_CORE_CLAMP = 1`, Eden PR #4664) with AVX2 non-temporal cache decompression (`_mm256_stream_si256` + `_MM_HINT_NTA`), hardens Core 0 audio biquad bounds (Eden PR #2), routes FFmpeg software decode slice workers strictly onto Core 5 (`0x20`) via `AVCodecContext::execute2`, and integrates 64-bit CityHash / bit-packed pipeline keys (Eden PR #4819 & #4210) alongside `HeapTracker` cleanup (Eden PR #3817).
-  * *What This Means In-Game:* Eliminates real-time shader compilation stutters, keeps HiBy FC3 audio completely crackle-free during heavy disk reads, prevents unpinned FFmpeg fallback threads from evicting Cores 2–4 JIT caches, and establishes a rock-solid baseline for Profile-Guided Optimisation (Stage 1 $\rightarrow$ Stage 2).
+  * *What This Means In-Game:* Eliminates real-time shader compilation stutters, keeps HiBy FC3 audio completely crackle-free during heavy disk reads, prevents unpinned FFmpeg fallback threads from evicting Cores 2–4 JIT caches, and establishes a rock-solid baseline for Profile-Guided Optimisation (Stage 1 → Stage 2).
 * **🎨 Phase 2: Descriptor Throughput, Contiguity Safety & Math Acceleration (`v1.34`)**
   * *Core Engineering Focus:* Deploys a 64-byte L1-aligned Xbyak Macro-JIT emitter with strict 32-bit sign-extended branch bounds to unlock single-cycle Maxwell XMAD execution; enforces GTX 980 Ti `maxPushDescriptors` limits and physical page-contiguity checks (Citron PR #4688, #449, #383) on uniform buffer passthrough streams; adds procedural vertex-less draw fastpaths (Citron PR #448); clamps `VkImageSubresourceRange` mip/layer counts (Citron PR #385 & #447) while packing $< 16$-byte uniforms into a pre-allocated ring (`emit_spirv.cpp`); and hardens `libswresample` with AVX2 SIMD FIR filters and `SWR_DITHER_TRIANGULAR_HIGHPASS` (`aresample=async=1`) for non-48 kHz audio streams.
   * *What This Means In-Game:* Boosts frame rates in geometry- and particle-heavy scenes by slashing CPU driver validation overhead on Core 1 (`0x02`), guarantees phase-linear 24-bit/48 kHz audio resampling before hitting your HiBy FC3 DAC, and eliminates split-DMA geometry corruption and Maxwell `VK_ERROR_DEVICE_LOST` driver crashes.
@@ -110,10 +110,10 @@ Eden Espresso Wave [AX] (Master v1.34) follows a strict, six-phase engineering r
   * *Core Engineering Focus:* Interfaces directly with Windows DXGI (5.50 GB) and Linux `VK_EXT_memory_budget` (5.35 GB with `lsfg-vk`) counters inside VBLANK windows via rigid 64 KB block flushes/LOD scaling; backs dynamic render targets with a pre-allocated 64 KB Sparse Page-Aliased VMA pool (`VK_KHR_bind_memory2`) alongside a time-sliced Fragment-Aware Texture Reaper; uses CPU address deltas (Eden PR #32) for exact overlap invalidation; upgrades ASTC recompression from RGB 5:6:5 (BC1/BC3) to Maxwell-native BC7 (1.0 BPP 8-bit adaptive modes) and BC6H (HDR); introduces a `libswresample` software micro-pitch PLL ($\pm 0.005\%$) to absorb crystal drift; and adds the `eden_engine.ini` proportional 2:3:1 physical-core scaler plus runtime hardware capability flags.
   * *What This Means In-Game:* Eliminates the colour banding seen in BC3 skyboxes and shadows while still cutting VRAM usage by $75\%$ compared to uncompressed RGBA8—eliminating mid-game `vkAllocateMemory` stalls and preventing multi-hour open-world sessions from hitting the GTX 980 Ti's 6 GB VRAM wall.
 * **🎨 Phase 4: Async Concurrency, Cross-Silicon Offloading & Reversible IRQ Steering (`v1.36`)**
-  * *Core Engineering Focus:* Binds native WinRT Windows Graphics Capture (WGC) handles directly to Vulkan swapchain surfaces inside VRAM for zero-copy `lsfg-vk` frame generation (0 ms PCIe transfer); opens a secondary Vulkan Asynchronous Compute Queue (`VK_QUEUE_COMPUTE_BIT`) synchronised via timeline semaphores for ASTC$\rightarrow$BC7 transcoding; runs COM-isolated Intel UHD 630 QSV decoding paired with FFmpeg `vpp_qsv` / `scale_qsv` hardware NV12$\rightarrow$BGRA conversion over zero-copy `IDXGIResource1` Windows NT Shared Handles (and VA-API `dma_buf` FDs on Piccolo); exposes native `AV_HWDEVICE_TYPE_VULKAN` (`VK_KHR_video_decode_queue`) as a zero-copy fallback decoder; and introduces a reversible runtime MSI IRQ helper (`Scripts\irq_runtime_helper.ps1`).
+  * *Core Engineering Focus:* Binds native WinRT Windows Graphics Capture (WGC) handles directly to Vulkan swapchain surfaces inside VRAM for zero-copy `lsfg-vk` frame generation (0 ms PCIe transfer); opens a secondary Vulkan Asynchronous Compute Queue (`VK_QUEUE_COMPUTE_BIT`) synchronised via timeline semaphores for ASTC → BC7 transcoding; runs COM-isolated Intel UHD 630 QSV decoding paired with FFmpeg `vpp_qsv` / `scale_qsv` hardware NV12 → BGRA conversion over zero-copy `IDXGIResource1` Windows NT Shared Handles (and VA-API `dma_buf` FDs on Piccolo); exposes native `AV_HWDEVICE_TYPE_VULKAN` (`VK_KHR_video_decode_queue`) as a zero-copy fallback decoder; and introduces a reversible runtime MSI IRQ helper (`Scripts\irq_runtime_helper.ps1`).
   * *What This Means In-Game:* Delivers ultra-responsive $2\times$/$3\times$ frame interpolation without PCIe bus lag, prevents heavy texture compute passes from stalling 3D rendering on the GTX 980 Ti, and eliminates CPU `sws_scale()` cache thrashing during pre-rendered cutscenes.
 * **🎨 Phase 5: Closed-Loop Telemetry, Predictive Storage Pre-Faulting & Production Appliance (`v1.37`)**
-  * *Core Engineering Focus:* Adds a strided Predictive HDD-to-NVMe Block Pre-Faulting Ring on Core 5 (`0x20`) that stages upcoming `.chd`/`.ncz` chunks from `J:\Switch` into RAM / NVMe #2 (`E:\updates\cache`); deploys a Closed-Loop Thermal & Frame-Pacing Governor driven by live `g_metrics` counters (dynamically tuning `_mm_pause()` spin tails and Core 0/5 `HostTiming` placement); enforces Maxwell SPIR-V register-pressure guards (`emit_spirv.cpp`); binds direct Core 5 RawInput/HID controller polling; feeds Phase 4 WinRT WGC swapchain handles into FFmpeg `hevc_qsv` / `h264_qsv` + libavformat on Core 5 (`0x20`) for zero-overhead gameplay recording; drives an external 3.5" USB-C Turing Smart Screen (`COMx`) with zero Vulkan swapchain hooks; and ships the production Eden Piccolo [AX] v1.0 $< 300\text{ MB}$ toram USB appliance.
+  * *Core Engineering Focus:* Adds a strided Predictive HDD-to-NVMe Block Pre-Faulting Ring on Core 5 (`0x20`) that stages upcoming `.chd`/`.ncz` chunks from `J:\Switch` into RAM / NVMe #2 (`E:\updates\cache`); deploys a Closed-Loop Thermal & Frame-Pacing Governor driven by live `g_metrics` counters (dynamically tuning `_mm_pause()` spin tails and Core 0/5 `HostTiming` placement); enforces Maxwell SPIR-V register-pressure guards (`emit_spirv.cpp`); binds direct Core 5 RawInput/HID controller polling; feeds Phase 4 WinRT WGC swapchain handles into FFmpeg `hevc_qsv` / `h264_qsv` + `libavformat` on Core 5 (`0x20`) for zero-overhead gameplay recording; drives an external 3.5" USB-C Turing Smart Screen (`COMx`) with zero Vulkan swapchain hooks; and ships the production Eden Piccolo [AX] v1.0 $< 300\text{ MB}$ `toram` USB appliance.
   * *What This Means In-Game:* Masks 7200 RPM hard-drive seek times during open-world traversal, shaves 1–2 frames off controller input latency, enables zero-FPS-loss gameplay capture without touching GTX 980 Ti VRAM, and displays live silicon telemetry on a dedicated desk sub-screen.
 * **🎨 Phase 6: Blue-Sky Autonomous Silicon & Neural Runtime (`v2.00` — Forward-Looking R&D)**
   * *Core Engineering Focus:* Introduces a Live Background Superblock Re-Compiler on Core 5 (`0x20`) that compiles unrolled AVX2 traces from live branch telemetry and hot-swaps them into Dynarmic between frames; runs a 720p/540p `R8_UNORM` luma-only compute downscale on the GTX 980 Ti ($\sim 75\text{--}85\%$ PCIe Gen 3 bandwidth reduction) before offloading hardware optical-flow motion estimation onto the idle Intel UHD 630 iGPU's fixed-function VME engine to eliminate `lsfg-vk` HUD warping; integrates a £5 RP2040 / ESP32-S3 USB-C hardware sync & physical toggle-switch dongle; and runs predictive whole-title hot-migration between your 7200 RPM HDD and NVMe #2.
@@ -124,7 +124,7 @@ Eden Espresso Wave [AX] (Master v1.34) follows a strict, six-phase engineering r
 ## 🎛️ Section 5: Optimal Driver, Engine & FlexASIO Runtime Configuration
 
 ### 5.1 Optimal NVIDIA Control Panel Overrides (`eden.exe`)
-Open the NVIDIA Control Panel $\rightarrow$ Manage 3D Settings $\rightarrow$ Program Settings, add `eden.exe`, and apply these five overrides:
+Open the NVIDIA Control Panel → Manage 3D Settings → Program Settings, add `eden.exe`, and apply these five overrides:
 1. **Vulkan/OpenGL Present Method:** Prefer layered on DXGI Swapchain
 2. **Threaded Optimization:** On (with Core 1 `0x02` isolation)
 3. **Max Frame Rate:** Off
@@ -132,7 +132,7 @@ Open the NVIDIA Control Panel $\rightarrow$ Manage 3D Settings $\rightarrow$ Pro
 5. **Texture Filtering – Quality:** High Performance
 
 ### 5.2 Optimal Internal Eden Subsystem Configuration
-Once `eden.exe` boots, open Emulation $\rightarrow$ Configure and align your internal settings:
+Once `eden.exe` boots, open Emulation → Configure and align your internal settings:
 * **Multicore CPU Emulation:** Enabled (engages your Elastic 2:3:1 home-biased fiber partition across `0x1C` and `0x3C`).
 * **CPU Accuracy:** Unsafe (for maximum throughput) or Auto.
 * **API:** Vulkan (NVIDIA GeForce GTX 980 Ti).
@@ -147,7 +147,7 @@ Once `eden.exe` boots, open Emulation $\rightarrow$ Configure and align your int
 #### 1. Windows Sound Control Panel (`mmsys.cpl`) Prerequisites
 Before launching `eden.exe`, verify your USB DAC's Windows audio properties so WASAPI Exclusive Mode locks at the Nintendo Switch's native 48 kHz sample clock:
 1. Press `Win + R`, type `mmsys.cpl`, and press **Enter**.
-2. On the **Playback** tab, right-click your active USB DAC (e.g., **HiBy USB Audio** or **Speakers (Bumble Bee)**) $\rightarrow$ **Properties** $\rightarrow$ **Advanced**:
+2. On the **Playback** tab, right-click your active USB DAC (e.g., **HiBy USB Audio** or **Speakers (Bumble Bee)**) → **Properties** → **Advanced**:
    * **Default Format:** Select **`2 channel, 24 bit, 48000 Hz (Studio Quality)`** to match native Switch PCM output with zero resampling overhead.
    * **Exclusive Mode:** Ensure both **Allow applications to take exclusive control of this device** and **Give exclusive mode applications priority** are checked.
 3. On the **Spatial sound** tab, ensure **Off** is selected so Windows spatial DSP cannot intercept the exclusive stream.
@@ -178,8 +178,7 @@ suggestedLatencySeconds = 0.0
 channels = 2
 ```
 
-* **In-App Audio Alignment:** Inside Eden (**Emulation $\rightarrow$ Configure $\rightarrow$ Audio**), set **Output Engine** to `cubeb` (or `sdl3`) and **Output Device** to `FlexASIO`.
-
+* **In-App Audio Alignment:** Inside Eden (**Emulation → Configure → Audio**), set **Output Engine** to `cubeb` (or `sdl3`) and **Output Device** to `FlexASIO`.
 
 ---
 
@@ -190,18 +189,18 @@ channels = 2
 | Platform / Environment | CPU Architecture & Scheduling | GPU Architecture & Memory Path | Real-World Performance Profile (Switch 1 Titles) |
 | :--- | :--- | :--- | :--- |
 | **Nintendo Switch 1** | $4\times$ ARM Cortex-A57 @ 1.02 GHz | NVIDIA Tegra X1 Maxwell (shared LPDDR4) | **Resource-Bound Baseline:** High efficiency, but constrained by 25.6 GB/s bandwidth. Drops to 40–45 FPS in heavy titles. |
-| **Stock Eden** | Generic ARM64$\rightarrow$x86-64 Dynarmic JIT; unpinned OS thread scheduling | Generic Vulkan/OpenGL translation | **Conservative Baseline:** Hits 60 FPS in lighter titles, but suffers 45–60 FPS dips and shader-compile stutters. |
-| **Citron** | Generic ARM64$\rightarrow$x86-64 JIT; aggressive caching without core isolation | Vulkan translation with aggressive caching | **Volatile Peak Frames:** High raw peak FPS, but uneven frametime pacing and micro-stutters during cold shader builds. |
+| **Stock Eden** | Generic ARM64 → x86-64 Dynarmic JIT; unpinned OS thread scheduling | Generic Vulkan/OpenGL translation | **Conservative Baseline:** Hits 60 FPS in lighter titles, but suffers 45–60 FPS dips and shader-compile stutters. |
+| **Citron** | Generic ARM64 → x86-64 JIT; aggressive caching without core isolation | Vulkan translation with aggressive caching | **Volatile Peak Frames:** High raw peak FPS, but uneven frametime pacing and micro-stutters during cold shader builds. |
 | **Eden Espresso Wave [AX] (Master v1.34)** | Elastic 2:3:1 Non-SMT (`0x01`, `0x02`, `0x1C`, `0x20`) + 1-cycle BMI1 + 2 MB Large Pages + PGO L1i | GTX 980 Ti on Core 1 + UBO Templates + Intel UHD 630 QSV Offload + 5.50 GB DXGI VRAM Shield | **Locked Console-Grade Consistency:** Rock-solid 60 FPS at $2\times$/$3\times$ with flat frametimes and bit-perfect HiBy FC3 audio. |
 | **Nintendo Switch 2** | $8\times$ ARM Cortex-A78C @ $\sim 2.1\text{ GHz}$ | Custom NVIDIA Ampere (native ASTC & DLSS) | **Brute-Force Native Compatibility:** Locks struggling titles to 60 FPS out-of-the-box via raw ARM/Ampere throughput. |
 
-### 6.3 Telemetry Verification & Troubleshooting Quick-Reference
+### 6.2 Telemetry Verification & Troubleshooting Quick-Reference
 
 | Symptom | Root Cause | Immediate Fix |
 | :--- | :--- | :--- |
-| **Audio Clicks / `audio_underruns > 0`** | `bufferSizeSamples = 128` is too tight, or `storahci.sys` DPCs hitting Core 0. | 1. Run `Scripts\set_irq_affinity.ps1` as Admin and reboot.<br>2. Increase `bufferSizeSamples` to 192 or 256 in `FlexASIO.toml`. |
+| **Audio Clicks / `audio_underruns > 0`** | `bufferSizeSamples = 128` is too tight, or `storahci.sys` DPCs hitting Core 0. | 1) Run `Scripts\set_irq_affinity.ps1` as Admin and reboot; 2) Increase `bufferSizeSamples` to `192` or `256` in `FlexASIO.toml`. |
 | **Intel QSV Option Inactive** | Intel UHD 630 iGPU disabled in BIOS or DVMT aperture too small. | Enable *IGFX Multi-Monitor* in BIOS and set DVMT Pre-Allocated to 256 MB – 512 MB. |
-| **Stutter After 1–2 Hours** | Uncompressed RGBA8 ASTC textures exceeded GTX 980 Ti past its 5.50 GB VRAM ceiling. | Switch ASTC Recompression to BC3 (or BC7 in Phase 3) in per-game *Properties* $\rightarrow$ *Graphics*. |
+| **Stutter After 1–2 Hours** | Uncompressed RGBA8 ASTC textures exceeded GTX 980 Ti past its 5.50 GB VRAM ceiling. | Switch ASTC Recompression to BC3 (or BC7 in Phase 3) in per-game *Properties* → *Graphics*. |
 | **Flickering Geometry** | Non-contiguous DMA boundary or push-descriptor overflow in `vk_ubo_passthrough.cpp`. | Set `fast_ubo_passthrough = false` in per-game properties to verify. |
 
 ---
@@ -220,7 +219,7 @@ channels = 2
 
 ### 7.2 Master Configurator Hub (`PGO_configurator.bat`) & End-to-End Build Process
 
-The unified master hub (`PGO_configurator.bat`) orchestrates all pipeline stages. All build scripts feature a fixed **row 45 VT100 scroll-region lock** (`%ESC%[45;r%ESC%[45;1H`) to protect the Espresso AX banner and optimization feature lists from being overwritten by streaming build logs.
+The unified master hub (`PGO_configurator.bat`) orchestrates all pipeline stages. All build scripts feature a fixed **row 45 VT100 scroll-region lock** (`%ESC%[45;r%ESC%[45;1H`) to protect the Espresso AX banner and optimization feature lists from being overwritten by streaming build logs:
 
 ```text
 [ 1. WORKSPACE PURGE ]        [ 2. STAGE 0 CONTROL ]         [ 3. STAGE 1 INSTRUMENT ]       [ 4. STAGE 2 FINAL BAKE ]
@@ -232,16 +231,16 @@ The unified master hub (`PGO_configurator.bat`) orchestrates all pipeline stages
 * **Instrumented Training Build (`[1]` Stage 1):** Compiles `build_stage1\bin\eden.exe` with `/fp:precise` and `-fprofile-generate=...` across three 15-minute gameplay training sweeps (`J:\Switch`).
 * **Profile Validation & Production Bake (`[2]` Stage 2):** Audits `.profraw` traces, merges them via `llvm-profdata merge`, and compiles the final optimized binary with `/O3 /Ob3 /fp:fast -fprofile-use=eden.profdata -flto=thin -march=skylake`.
 
-### 7.4 Comprehensive Build & Runtime Troubleshooting Matrix
+### 7.3 Comprehensive Build & Runtime Troubleshooting Matrix
 
 | Category | Symptom / Error Message | Root Cause | Exact Resolution |
 | :--- | :--- | :--- | :--- |
 | **Linker (`lld-link`)** | `undefined symbol: mainCRTStartup, memcpy, _chkstk` | `/NODEFAULTLIB:msvcrt.lib` stripped the `/MD` dynamic C runtime import library. | Keep `/NODEFAULTLIB:libcmt.lib` in `CMakeLists.txt` so `msvcrt.lib` and `ucrt.lib` link cleanly. |
 | **Linker (`lld-link`)** | `could not open 'nvcuvid.lib' or 'cuda.lib'` | Unused NVIDIA CUDA/NVDEC libraries listed in `PLATFORM_LIBRARIES`. | Remove `nvcuvid` and `cuda` from `CMakeLists.txt`; use Intel QSV (`mfplat`, `mfuuid`, `d3d11`, `dxgi`). |
 | **Win32 Macros** | `error: no member named 'CreateEventA'` | `<windows.h>` included without `NOMINMAX` or `#undef CreateEvent`. | Define `#define NOMINMAX` above `<windows.h>` and `#undef CreateEvent` immediately after. |
-| **PowerShell Add-Type** | `Parameter set cannot be resolved / Expected class, delegate, enum` | Conflicting `-Name` / `-Namespace` parameters passed alongside a self-contained C#-defined `namespace Win32` block. | Omit standalone `-Name` / `-Namespace` parameters in `Add-Type -TypeDefinition $w_code` when the C# snippet already declares its own namespace and class structure. |
-| **Source Hygiene** | `error: expected unqualified-id (at EOF of settings.cpp or qsv_decoder.cpp)` | Stray markdown code fence backticks (```) appended from text export copy-pastes. | Open the affected C++ source file, scroll to the bottom, and remove any stray backticks or citation markers. |
-| **Compiler (fmt 12.1)** | `type_is_unformattable_for<EnumType, char>` | fmt 12.1.0 requires explicit `fmt::underlying(...)` for scoped enums. | Wrap scoped enums in `fmt::underlying(val)` inside `LOG*` / `ASSERT_MSG` calls. |
+| **PowerShell `Add-Type`** | `Parameter set cannot be resolved / Expected class, delegate, enum` | Conflicting `-Name` / `-Namespace` parameters passed alongside a self-contained C#-defined `namespace Win32` block. | Omit standalone `-Name` / `-Namespace` parameters in `Add-Type -TypeDefinition $w_code` when the C# snippet already declares its own namespace and class structure. |
+| **Source Hygiene** | `error: expected unqualified-id (at EOF of settings.cpp or qsv_decoder.cpp)` | Stray markdown code fence backticks appended from text export copy-pastes. | Open the affected C++ source file, scroll to the bottom, and remove any stray backticks or citation markers. |
+| **Compiler (`fmt 12.1`)** | `type_is_unformattable_for<EnumType, char>` | `fmt 12.1.0` requires explicit `fmt::underlying(...)` for scoped enums. | Wrap scoped enums in `fmt::underlying(val)` inside `LOG*` / `ASSERT_MSG` calls. |
 | **Compiler (`clang-cl`)** | `no matching function for call to '_bextr_u64'` | `_bextr_u64` requires 3 arguments on `clang-cl`. | Use `_bextr_u64(value, start, length)` in `src/common/bmi_util.h`. |
 
 ---
@@ -257,8 +256,8 @@ The unified master hub (`PGO_configurator.bat`) orchestrates all pipeline stages
 
 ### 8.3 Only the First Step: The Path Ahead
 Getting `eden.exe` built, partitioned, and running is only the first step. The road ahead turns a custom binary into a self-tuning console appliance:
-* **PGO Telemetry Baking (Stage 1 $\rightarrow$ Stage 2):** Capturing real gameplay branch profiles across your library.
+* **PGO Telemetry Baking (Stage 1 → Stage 2):** Capturing real gameplay branch profiles across your library.
 * **Maxwell Throughput & BC7/BC6H Fidelity (Phases 2 & 3):** Deploying 32-bit Macro-JIT emitters, page-contiguity UBO streams, a 5.50 GB DXGI VRAM shield, and near-lossless BC7 / BC6H texture compression.
-* **Heterogeneous Silicon & Closed-Loop Polish (Phases 4, 5 & 6):** Unlocking zero-copy WinRT WGC frame generation, asynchronous compute queues, predictive HDD-to-NVMe pre-faulting, the $< 300\text{ MB}$ toram Eden Piccolo [AX] USB appliance, and live background superblock re-compilation.
+* **Heterogeneous Silicon & Closed-Loop Polish (Phases 4, 5 & 6):** Unlocking zero-copy WinRT WGC frame generation, asynchronous compute queues, predictive HDD-to-NVMe pre-faulting, the $< 300\text{ MB}$ `toram` Eden Piccolo [AX] USB appliance, and live background superblock re-compilation.
 
-*Thank you for being part of this build—now let's fire up `build_stage0\bin\eden.exe` and watch the silicon sing!*
+*Thank you for being part of this build—now let's fire up `build_stage0\bin\eden.exe` and watch the silicon sing!*[cite: 13]

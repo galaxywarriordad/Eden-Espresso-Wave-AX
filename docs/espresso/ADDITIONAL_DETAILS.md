@@ -1,7 +1,7 @@
 # 📑 Eden Espresso Wave [AX] — Additional Technical Reference & Implementation Details
 
 **Supplementary Engineering Reference (Master v1.34)**  
-**Updated:** 2026-11-16  
+**Updated:** `2026-11-16`  
 Captures low-level INI schemas, LLVM/Clang-cl 23 & MSVC 14.51+ ABI guards, cross-compiler syntax patches, shader preprocessor rules, telemetry internals, and PowerShell/Batch automation specifications not covered in the primary guides.
 
 ---
@@ -110,4 +110,4 @@ To prevent script breakage across restricted Windows 10 environments, all reposi
   ```bat
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Scripts\macro_update.ps1"
   ```
-* **Batch Multi-Line `else` & Delayed Expansion Safety:** Avoid complex multi-line nested `if (...) else (...)` blocks in `.bat` files where parenthesis parsing edge cases cause silent syntax failures. Use explicit separate conditional checks (`if %ERRORLEVEL% neq 0 (...)`) paired with `setlocal EnableDelayedExpansion` (`!VAR!`) inside loops.
+* **Batch Multi-Line `else` & Delayed Expansion Safety:** Avoid complex multi-line nested `if (...) else (...)` blocks in `.bat` files where parenthesis parsing edge cases cause silent syntax failures. Use explicit separate conditional checks (`if %ERRORLEVEL% neq 0 (...)`) paired with `setlocal EnableDelayedExpansion` (`!VAR!`) inside loops[cite: 15].

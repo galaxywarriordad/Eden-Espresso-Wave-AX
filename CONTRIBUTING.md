@@ -44,4 +44,4 @@ When opening an issue on **`galaxywarriordad/Eden-Espresso-Wave-AX`**, please in
 
 1. **Hardware & BIOS Topology:** CPU model/clocks, GPU model/driver version, iGPU DVMT allocation, and USB DAC model.
 2. **Runtime Telemetry & Logs:** Attach `%APPDATA%\eden\log\eden_log.txt` and `build_stage_telemetry_metrics.json` (verifying `"audio_underruns"` and `"shader_worker_threads"`).
-3. **Reproduction Steps:** Note whether the issue occurs with `fast_ubo_passthrough` enabled or disabled, and which **ASTC Recompression** mode (`Uncompressed` vs. `BC3`) is active.
+3. **Reproduction Steps:** Note whether the issue occurs with `fast_ubo_passthrough` enabled or disabled, and which **ASTC Recompression** mode (`Uncompressed` vs. `BC3`) is active[cite: 25].

@@ -1,28 +1,28 @@
 # 🗺️ Eden Emulator: Comprehensive Architectural Specification (Master v1.34)
 
 Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, & Global Microarchitectural Dependency Matrix  
-**Updated:** 2026-11-16 (Post-Shader Macro Harmonization & Pipeline Telemetry Sprint)
+**Updated:** `2026-11-16` (Post-Shader Macro Harmonization & Pipeline Telemetry Sprint)
 
-**Hardware Baseline:** Intel Core i5-9600K (6 Physical Cores / 6 Hardware Threads / Zero SMT — $x48$ / 4.8 GHz locked symmetrically across all cores, 9 MB L3 Smart Cache) + NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200) + Intel UHD Graphics 630 iGPU (Vendor `0x8086`) + HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
+**Hardware Baseline:** Intel Core i5-9600K (6 Physical Cores / 6 Hardware Threads / Zero SMT — `x48` / `4.8 GHz` locked symmetrically across all cores, 9 MB L3 Smart Cache) + NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200) + Intel UHD Graphics 630 iGPU (Vendor `0x8086`) + HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
 
-**Target Platforms:** Windows 10/11 Desktop Host (`PGO_stage0LD.bat` $\rightarrow$ `PGO_stage1.bat` $\rightarrow$ `PGO_stage2.bat`) & Eden Piccolo [AX] ($< 300\text{ MB}$ toram EROFS `PREEMPT_RT` Batocera USB Appliance)
+**Target Platforms:** Windows 10/11 Desktop Host (`PGO_stage0LD.bat` → `PGO_stage1.bat` → `PGO_stage2.bat`) & Eden Piccolo [AX] (`< 300 MB` `toram` EROFS `PREEMPT_RT` Batocera USB Appliance)
 
 **Storage Topology:**
 * **NVMe #1:** OS + `eden.exe` + Vulkan Shader Cache
-* **NVMe #2:** $< 200\text{ MB}$ Updates & DLCs
+* **NVMe #2:** `< 200 MB` Updates & DLCs
 * **7200 RPM SATA HDD:** Level-18 Block-Compressed `.chd` / `.ncz` Main Game Images
 
 ---
 
 ## 📑 Table of Contents
 
-* [Section 1: Unified Macro Data-Flow, PGO Workspace Automation, & Host Runtime Topology](#section-1-unified-macro-data-flow-pgo-workspace-automation--host-runtime-topology)
-* [Section 2: Host Memory Virtualization, GMMU Page Translation, & Cache-Coherency Tracking](#section-2-host-memory-virtualization-gmmu-page-translation--cache-coherency-tracking)
-* [Section 3: Asynchronous CPU Execution, Fiber Thread Dispatching, & Temporal Pacing](#section-3-asynchronous-cpu-execution-fiber-thread-dispatching--temporal-pacing)
-* [Section 4: Real-Time Audio Scheduling, Graph Compilation, & FlexASIO Silicon Offloading](#section-4-real-time-audio-scheduling-graph-compilation--flexasio-silicon-offloading)
-* [Section 5: Real-Time Video, Telemetry OSD, Storage/Shader Quarantine, GTX 980 Ti Texture Compression Policy, & Telemetry](#section-5-real-time-video-telemetry-osd-storageshader-quarantine-gtx-980-ti-texture-compression-policy--telemetry)
-* [Section 6: Consolidated Upstream PR Triage & Silicon Adaptation Matrix](#section-6-consolidated-upstream-pr-triage--silicon-adaptation-matrix)
-* [Section 7: Expanded 6-Phase Linear Engineering Roadmap](#section-7-expanded-6-phase-linear-engineering-roadmap)
+* [Section 1: Unified Macro Data-Flow, PGO Workspace Automation, & Host Runtime Topology](#-section-1-unified-macro-data-flow-pgo-workspace-automation--host-runtime-topology)
+* [Section 2: Host Memory Virtualization, GMMU Page Translation, & Cache-Coherency Tracking](#️-section-2-host-memory-virtualization-gmmu-page-translation--cache-coherency-tracking)
+* [Section 3: Asynchronous CPU Execution, Fiber Thread Dispatching, & Temporal Pacing](#️-section-3-asynchronous-cpu-execution-fiber-thread-dispatching--temporal-pacing)
+* [Section 4: Real-Time Audio Scheduling, Graph Compilation, & FlexASIO / ALSA Silicon Offloading](#-section-4-real-time-audio-scheduling-graph-compilation--flexasio--alsa-silicon-offloading)
+* [Section 5: Real-Time Video, Telemetry OSD, Storage/Shader Quarantine, GTX 980 Ti Texture Compression Policy, & Telemetry](#-section-5-real-time-video-telemetry-osd-storageshader-quarantine-gtx-980-ti-texture-compression-policy--telemetry)
+* [Section 6: Consolidated Upstream PR Triage & Silicon Adaptation Matrix](#-section-6-consolidated-upstream-pr-triage--silicon-adaptation-matrix)
+* [Section 7: Expanded 6-Phase Linear Engineering Roadmap](#️-section-7-expanded-6-phase-linear-engineering-roadmap)
 
 ---
 
@@ -118,7 +118,7 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 * **Single-Cycle 3-Argument BMI1 Intrinsic Translation (`bmi_util.h` & `memory.cpp`):** Inside `Common::BitUtils::ExtractBitField`, `GetPointerFromRasterizerCachedMemory`, and `GetPointerFromDebugMemory`, page-index extraction invokes the explicit 3-argument Coffee Lake BMI1 intrinsic `_bextr_u64(vaddr, static_cast<u8>(YUZU_PAGEBITS), 36)` (`HAS_BMI1 = 1` under `-march=skylake`). This compiles directly to the single-cycle x86-64 `BEXTR` instruction.
 * **Split-Path GMMU Page Table Resolution (`Core::DeviceMemoryManager`):** Hooks the backing store directly into graphics page table layers to accommodate games that alias a single physical texture buffer or vertex array across multiple distinct virtual address handles (`MULTI_FLAG` mode redirects multi-aliased textures to a dedicated `MultiAddressContainer` chain).
 * **Lock-Free Weak-CAS Dirty Tracking (`Core::GPUDirtyMemoryManager::Collect`):** Packs the page address and sub-page modification bitmask into a single 8-byte `TransformAddress` and applies a lock-free weak Compare-And-Swap loop (`compare_exchange_weak` with `std::memory_order_acq_rel`), allowing parallel execution threads to merge dirty snapshots with zero thread-scheduling latency.
-* **Hardware Bit-Scan Coherency Extraction (`Gather()`):** Executed directly on Core 1 (`0x02`) alongside Vulkan command submission. Swaps internal collection array pointers instantly (`front_buffer.swap(back_buffer)`), then processes snapshots using C++20 bit-manipulation primitives (`std::countr_zero` / `std::countr_one` / `ClearLowestSetBit` $\rightarrow$ `TZCNT` / `BLSR`) to extract continuous dirty byte lengths in a few clock cycles.
+* **Hardware Bit-Scan Coherency Extraction (`Gather()`):** Executed directly on Core 1 (`0x02`) alongside Vulkan command submission. Swaps internal collection array pointers instantly (`front_buffer.swap(back_buffer)`), then processes snapshots using C++20 bit-manipulation primitives (`std::countr_zero` / `std::countr_one` / `ClearLowestSetBit` → `TZCNT` / `BLSR`) to extract continuous dirty byte lengths in a few clock cycles.
 
 ---
 
@@ -130,7 +130,7 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 
 * **User-Mode Fiber Context Switching (`Core::CpuManager`):** Maps emulated ARM cores onto host processor tracks using User-Mode Fibers (`Common::Fiber` via `PhysicalCore::RunThread` and `KInterruptManager::HandleInterrupt`), eliminating OS kernel-mode context switches and keeping host CPU instruction caches populated.
 * **Home-Biased Elastic 2:3:1 Guest Scheduling (`Core::CpuManager::RunThread`):**
-  * **Guest ARM Cores 0–2 (`PrimaryGuestJit = 0x1C` / `ThreadPriority::High`):** Scheduled inside a home-biased `Common::Fiber` pool with 1:1 ideal-processor affinity biasing (Guest Core 0 $\rightarrow$ Core 2 `0x04`, Guest Core 1 $\rightarrow$ Core 3 `0x08`, Guest Core 2 $\rightarrow$ Core 4 `0x10`) before stealing across `0x1C`. Preserves private 32 KB L1d and 256 KB L2 caches while remaining 100% shielded from `.chd`/`.ncz` decompression, shaders, QSV/VA-API, and storage IRQs.
+  * **Guest ARM Cores 0–2 (`PrimaryGuestJit = 0x1C` / `ThreadPriority::High`):** Scheduled inside a home-biased `Common::Fiber` pool with 1:1 ideal-processor affinity biasing (Guest Core 0 → Core 2 `0x04`, Guest Core 1 → Core 3 `0x08`, Guest Core 2 → Core 4 `0x10`) before stealing across `0x1C`. Preserves private 32 KB L1d and 256 KB L2 caches while remaining 100% shielded from `.chd`/`.ncz` decompression, shaders, QSV/VA-API, and storage IRQs.
   * **Guest ARM Core 3 (`ElasticGuestPool = 0x3C` / `ThreadPriority::Normal`):** Biased to Core 5 (`0x20`) via `SetCurrentThreadIdealProcessor(5)` to run lightweight Horizon OS services, while retaining `0x3C` elastic spillover onto Cores 2–4 so cross-core IPC never stalls during SATA AHCI + Level-18 decompression bursts.
 * **Lock-Free Single-Core Preemption & Sequentially Consistent Page-Table Fences (`PreemptSingleCore` & `Memory::SetCurrentPageTable`):** Rotates `current_core` via a lock-free Compare-And-Swap loop, anchors single-core workloads onto Host Core 2 (`SingleCoreJit = 0x04`), and enforces `std::atomic_thread_fence(std::memory_order_seq_cst)` barriers across page-table transitions.
 * **$O(1)$ Amortized Fibonacci Heap Timeline (`Core::Timing::CoreTiming`):** Stores scheduled sub-device callbacks inside a Boost Fibonacci Heap (`heap_t`), providing $O(1)$ amortized complexity for insertions and key updates.
@@ -145,7 +145,7 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 
 ### 🔍 Microarchitectural Status Vetting & Technical Reality
 
-* **Inline Cache-Local Instantiation (`AudioCore::AudioCore`):** Instantiates `AudioManager` and the ADSP microkernel inline via `std::optional` to maintain strict L1/L2 cache locality on Host Core 0, operating at a stable 4.8 GHz BIOS x48 baseline. This guarantees absolute timing uniformity across zero-heap graph compilation sequences.
+* **Inline Cache-Local Instantiation (`AudioCore::AudioCore`):** Instantiates `AudioManager` and the ADSP microkernel inline via `std::optional` to maintain strict L1/L2 cache locality on Host Core 0, operating at a stable 4.8 GHz BIOS `x48` baseline. This guarantees absolute timing uniformity across zero-heap graph compilation sequences.
 * **MMCSS Pro Audio / `SCHED_FIFO 99` Preemption Guard & Voice-Drop Telemetry (`AudioCore::Renderer::SystemManager`):** Pins `AudioRenderSystemManager` onto Core 0 (`TimingAndAudio = 0x01`) at `ThreadPriority::Critical` wrapped in `ScopedProAudio` (`AvSetMmThreadCharacteristicsW` / `SCHED_FIFO` priority 99), monitoring renderer voice-drop pressure alongside sink-level `g_metrics.audio_underruns`.
 * **Cross-Core Lock-Free PCM Ring Buffer (`lockfree_audio_queue.hpp`):** Streams raw PCM samples generated by the JIT recompiler on Cores 2–5 over to Core 0 via a cache-line-aligned (`alignas(64)`) atomic ring buffer (`RING_CAPACITY = 2048`) with Acquire-Release semantics inside a tight 128-sample (2.67 ms Windows) / 96-frame (2.00 ms Piccolo ALSA) window.
 * **Primary Direct Hardware Path + Secondary Cubeb Fallback:**
@@ -201,7 +201,7 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 
 ## 🗺️ Section 7: Expanded 6-Phase Linear Engineering Roadmap
 
-### 🎨 Phase 1: Compiler Stability, Core Partitioning & Instrumentation Foundation (`v1.33` $\rightarrow$ `v1.34`)
+### 🎨 Phase 1: Compiler Stability, Core Partitioning & Instrumentation Foundation (`v1.33` → `v1.34`)
 * **Focus:** Stabilise execution timing, enforce cache-sticky core partitioning, harden Core 0/5 boundaries, automate shader macro normalization/SPIR-V validation, and deploy live per-core telemetry before attempting advanced GPU concurrency.
 * **File Footprint:** `CMakeLists.txt`, `eden_engine.ini`, `PGO_stage0LD.bat`, `PGO_stage1.bat`, `PGO_stage2.bat`, `Scripts\macro_update.ps1`, `Scripts\shader_validate.ps1`, `Scripts\telemetry_daemon.ps1`, `src/common/thread.h/.cpp`, `src/common/bmi_util.h`, `src/common/settings_enums.h`, `src/core/cpu_manager.cpp`, `src/core/core_timing.cpp`, `src/core/memory.cpp`, `src/core/crypto/ncz_decompressor.cpp`, `src/audio_core/renderer/system_manager.cpp`, `src/video_core/renderer_vulkan/vk_pipeline_worker.h/.cpp`, `vk_pipeline_cache.cpp`, `vk_cache_decompression.cpp`, `src/video_core/host1x/codecs/` (`nvdec.h`, `vp8.cpp`, `vp9.cpp`)
 * **Key Activities:** Elastic `2:3:1` core partitioning across uniform 4.8 GHz clock blocks, single-worker Core 5 shader pool & FFmpeg slice quarantine, audio biquad coefficient hardening, upstream hash condensation, numeric shader macro harmonization (`macro_update.ps1`), pre-build `glslangValidator` checks (`shader_validate.ps1`), and async JSON telemetry profiling (`telemetry_daemon.ps1`).
@@ -229,4 +229,4 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 ### 🎨 Phase 6: Blue-Sky Autonomous Silicon & Neural Runtime (`v2.00` — Forward-Looking R&D)
 * **Focus:** Transform the emulator from a static translator into a self-recompiling, zero-latency hardware appliance using live superblock re-compilation, hardware optical flow on the idle Intel UHD 630 iGPU, and custom USB microcontroller hardware interrupts.
 * **File Footprint:** `live_reopt_daemon.h/.cpp`, `igpu_optical_flow.h/.cpp`, `vfs_predictive_migrator.h/.cpp`, `firmware/usb_sync_bridge/`
-* **Key Activities:** Live background superblock re-compilation, cross-silicon VME optical flow motion vector synthesis, custom USB microcontroller VBLANK & audio clock-sync dongle, and predictive NVMe #2 whole-title hot-migration.
+* **Key Activities:** Live background superblock re-compilation, cross-silicon VME optical flow motion vector synthesis, custom USB microcontroller VBLANK & audio clock-sync dongle, and predictive NVMe #2 whole-title hot-migration[cite: 16].

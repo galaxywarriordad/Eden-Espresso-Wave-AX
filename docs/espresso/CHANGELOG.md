@@ -13,7 +13,7 @@ All notable changes, silicon-tuning milestones, and compiler fixes for **Eden Es
 
 ---
 
-## — 2026-11-16 (Advanced Shader Macro Harmonization & Pipeline Telemetry Integration)
+## [v1.34] — 2026-11-16 (Advanced Shader Macro Harmonization & Pipeline Telemetry Integration)
 ### Added
 * **Shader Macro Automation (`Scripts\macro_update.ps1`):** Enforced consistent numeric macro defines (`USE_EASU`, `USE_RCAS`, `YUZU_USE_FP16`, `VERSION`) across all shader wrappers to eliminate preprocessor token conflicts and Vulkan SPIR-V compilation failures.
 * **Pre-Build SPIR-V Validation (`Scripts\shader_validate.ps1`):** Added `glslangValidator`-powered shader syntax and SPIR-V validation prior to C++ build execution.
@@ -30,14 +30,14 @@ All notable changes, silicon-tuning milestones, and compiler fixes for **Eden Es
 
 ---
 
-## — 2026-11-13 (Audio Telemetry Logging Hook Integration)
+## [2026-11-13] — Audio Telemetry Logging Hook Integration
 ### Added
 * **Audio Telemetry Logging Hook (`PerformanceManager::TapFrame`):** Integrated real-time atomic tracking for `voices_dropped`, `voice_drop_parameter`, and `audio_processing_time_us` into `g_metrics` (`src/common/telemetry_types.hpp`), allowing the 250 ms telemetry daemon to audit ADSP voice shedding and buffer execution times on Host Core 0 (`0x01`).
 * **FlexASIO Endpoint Alignment:** Standardised the output target string to `device = "Speakers (HiBy FC3)"` in `FlexASIO.toml` for direct WASAPI exclusive-mode binding.
 
 ---
 
-## — 2026-11-12 (Stage 0 Verified Baseline)
+## [2026-11-12] — Stage 0 Verified Baseline
 ### Added
 * **Core Partitioning & IRQ Steering:** Enforced Win32 thread affinity masks (`src/common/thread.h/.cpp`) and steered hardware MSI IRQ policies via `set_irq_affinity.ps1`.
 * **Memory & Vector Acceleration:** Enabled `SeLockMemoryPrivilege` 2 MB large-page fastmem, BMI1 `_bextr_u64` page-index extraction, lock-free `GPUDirtyMemoryManager`, and AVX2 non-temporal pipeline cache decompression.
@@ -54,9 +54,9 @@ All notable changes, silicon-tuning milestones, and compiler fixes for **Eden Es
 
 ---
 
-## — 2026-11-03 (Initial Clang-cl 23 & Coffee Lake PGO Bring-Up)
+## [2026-11-03] — Initial Clang-cl 23 & Coffee Lake PGO Bring-Up
 ### Added
 * Initial 3-stage LLVM PGO scripts (`PGO_stage1.bat`, `PGO_stage2.bat`) with automated forward-slash path escaping, 32-byte heap over-alignment, and MSVC STL vector-annotation guards.
 
 ### Fixed
-* **Compiler & Audio Fixes:** Refactored `LAMBDA_FORCEINLINE` macros for strict Clang-cl rules, scrubbed C-flags in CMake, and resolved POSIX `getopt_long` null-pointer constants in `yuzu_room.cpp`.
+* **Compiler & Audio Fixes:** Refactored `LAMBDA_FORCEINLINE` macros for strict Clang-cl rules, scrubbed C-flags in CMake, and resolved POSIX `getopt_long` null-pointer constants in `yuzu_room.cpp`[cite: 17].

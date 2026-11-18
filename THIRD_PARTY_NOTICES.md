@@ -35,6 +35,6 @@
 | **Vulkan Memory Allocator (VMA) & Vulkan Headers** | MIT / Apache-2.0 License | GPU device memory management and Vulkan 1.4 dynamic dispatch definitions (`VK_NO_PROTOTYPES`). |
 | **FFmpeg** | LGPLv2.1+ / GPLv3 | Multimedia container and codec framework paired with Windows Media Foundation / Intel QSV offload. |
 | **Qt 6** | LGPLv3 / GPLv3 | Cross-platform desktop UI, configuration dialogs, and window surface hosting. |
-| **Boost (`Boost.Context` / `Boost.Heap`)** | Boost Software License 1.0 | User-mode fiber context switching (`Common::Fiber`) and \(\mathcal{O}(1)\) Fibonacci event heap (`CoreTiming`). |
+| **Boost (`Boost.Context` / `Boost.Heap`)** | Boost Software License 1.0 | User-mode fiber context switching (`Common::Fiber`) and $O(1)$ Fibonacci event heap (`CoreTiming`). |
 | **Zstandard (ZSTD) & LZ4** | BSD-3-Clause / BSD-2-Clause | Level-18 `.chd`/`.ncz` archive decompression (`ScopedNczQuarantine`) and pipeline cache compression. |
-| **fmt & nlohmann/json** | MIT License | Type-safe diagnostic logging (`fmt::underlying`) and atomic JSON telemetry serialisation (`g_metrics`). |
+| **fmt & nlohmann/json** | MIT License | Type-safe diagnostic logging (`fmt::underlying`) and atomic JSON telemetry serialisation (`g_metrics`)[cite: 26]. |

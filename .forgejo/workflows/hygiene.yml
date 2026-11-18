@@ -1,0 +1,75 @@
+name: AX Repository & Build Hygiene Gate
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  cloud-syntax-hygiene:
+    name: Cloud Syntax, CRLF & Link Hygiene
+    runs-on: windows-2022
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Enforce CRLF Line Endings on Windows Batch & PowerShell Scripts
+        shell: pwsh
+        run: |
+          $badFiles = @()
+          Get-ChildItem -Recurse -Include *.bat,*.ps1 | ForEach-Object {
+              $content = [System.IO.File]::ReadAllText($_.FullName)
+              if ($content -match "(?<!\r)\n") {
+                  $badFiles += $_.FullName
+              }
+          }
+          if ($badFiles.Count -gt 0) {
+              Write-Error "LF line endings detected in Windows scripts (CRLF required):`n$($badFiles -join "`n")"
+              exit 1
+          }
+          Write-Host "All .bat and .ps1 scripts verified with strict CRLF line endings."
+
+      - name: PowerShell AST Syntax & Shader Macro Check
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+              $errors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+              if ($errors.Count -gt 0) {
+                  Write-Error "Syntax error in $($_.FullName): $($errors[0].Message)"
+                  exit 1
+              }
+          }
+          if (Test-Path "Scripts\shader_validate.ps1") {
+              & "Scripts\shader_validate.ps1"
+          }
+
+      - name: Verify Cross-Repo Markdown Links & Governance Files
+        shell: pwsh
+        run: |
+          $required = @("README.md", "REPO_TOPOLOGY.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md", "THIRD_PARTY_NOTICES.md")
+          foreach ($file in $required) {
+              if (-not (Test-Path $file)) {
+                  Write-Error "Missing required root governance file: $file"
+                  exit 1
+              }
+          }
+          Write-Host "All root governance and topology files verified."
+
+  bare-metal-hardware-gate:
+    name: Reference Silicon Hardware & IRQ Telemetry Gate
+    runs-on: self-hosted
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Host Silicon Topology & Large Pages
+        shell: pwsh
+        run: |
+          if (Test-Path "Scripts\check_hardware.ps1") {
+              & "Scripts\check_hardware.ps1"
+          } else {
+              Write-Warning "Scripts\check_hardware.ps1 not found on runner."
+          }

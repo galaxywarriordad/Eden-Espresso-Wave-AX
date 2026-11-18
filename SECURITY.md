@@ -29,9 +29,9 @@ If you ever wish to revert Windows hardware interrupt steering or large-page pri
 1. **Reset PCIe / USB / SATA IRQ Affinity Policies (Run PowerShell as Administrator):**
    ```powershell
    Get-ChildItem "HKLM:\SYSTEM\CurrentControlSet\Enum" -Recurse -ErrorAction SilentlyContinue |
-     Where-Object { \$_.PSChildName -eq "Affinity Policy" } |
+     Where-Object { $_.PSChildName -eq "Affinity Policy" } |
      ForEach-Object {
-         Remove-ItemProperty -Path \$_.PSPath -Name "DevicePolicy","AssignmentSetOverride" -ErrorAction SilentlyContinue
+         Remove-ItemProperty -Path $_.PSPath -Name "DevicePolicy","AssignmentSetOverride" -ErrorAction SilentlyContinue
      }
    Write-Host "All custom IRQ affinity overrides cleared. Reboot Windows to restore default OS routing."
    ```
@@ -45,4 +45,4 @@ If you ever wish to revert Windows hardware interrupt steering or large-page pri
 If you discover a memory-safety issue, buffer overflow, or privilege-handling bug in our custom subsystems (e.g., `vk_ubo_passthrough.cpp`, `flex_asio_manager.cpp`, `qsv_decoder.cpp`, or `thread.cpp`):
 
 * Please open a private report or issue on **`galaxywarriordad/Eden-Espresso-Wave-AX`** with reproduction steps, your hardware topology, and relevant logs (`%APPDATA%\eden\log\eden_log.txt`).
-* Do **not** attach copyrighted game dumps, decryption keys, or firmware files to bug reports.
+* Do **not** attach copyrighted game dumps, decryption keys, or firmware files to bug reports[cite: 28].

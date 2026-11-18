@@ -1,71 +1,79 @@
+# 🔗 Eden Espresso Wave [AX] — Unified Subsystem Integration & Architectural Plan
 
-Eden Espresso Wave [AX] — Unified Subsystem Integration & Architectural Plan
+This document establishes the strategic engineering plan to resolve the four critical architectural stability gaps identified across the Master `v1.34`–`v2.00` specification. By ordering changes logically based on prerequisite dependencies, we construct a deterministic execution environment that eliminates sub-millisecond real-time jitter, cross-GPU frame tearing, memory subscription faults, and instruction cache drift across the platform topology.
 
-This document establishes the strategic engineering plan to resolve the four critical architectural stability gaps identified across the Master v1.34–v2.00 specification. By ordering changes logically based on prerequisite dependencies, we construct a deterministic execution environment that eliminates sub-millisecond real-time jitter, cross-GPU frame tearing, memory subscription faults, and instruction cache drift across the platform topology.
+---
 
-1. Introduction & Project Scope
+## 1. Introduction & Project Scope
 
+### 1.1 Objective & Strategic Purpose
 
-1.1 Objective & Strategic Purpose
+The objective of this engineering initiative is to eliminate the remaining sources of microarchitectural latency, asynchronous execution jitter, and multi-device timing drift across the **Eden Espresso Wave [AX]** emulator engine (Master `v1.34`–`v2.00`).
 
-The objective of this engineering initiative is to eliminate the remaining sources of microarchitectural latency, asynchronous execution jitter, and multi-device timing drift across the Eden Espresso Wave [AX] emulator engine (Master v1.34–v2.00).
-Operating a high-performance runtime system at sub-millisecond precision requires deterministic resource allocation. In multi-threaded emulation environments, unmanaged background tasks—such as asynchronous Shader compilation, video decoding, and file system queries—frequently introduce subtle timing variations. Left unmitigated, these anomalies generate cross-core cache line bouncing, unaligned interrupt spikes, and race conditions that degrade frame presentation and real-time audio stability.
+Operating a high-performance runtime system at sub-millisecond precision requires deterministic resource allocation. In multi-threaded emulation environments, unmanaged background tasks—such as asynchronous shader compilation, video decoding, and file system queries—frequently introduce subtle timing variations. Left unmitigated, these anomalies generate cross-core cache line bouncing, unaligned interrupt spikes, and race conditions that degrade frame presentation and real-time audio stability.
+
 To achieve pure zero-jitter frame delivery, this plan transforms the engine from an open-loop execution loop into a highly coordinated hardware appliance. The updates isolate critical rendering and audio pathways on dedicated execution cores, while offloading heavy system infrastructure metrics to background quarantine sinks.
 
-1.2 Engineering Scope
+### 1.2 Engineering Scope
 
 This plan details five concrete, sequential deployment blocks designed to resolve the four foundational stability gaps identified within the master backlog:
-• Deterministic Validation (Step 1): Deploying a performance-aware continuous integration gate and verification infrastructure to screen every modification against real-time microarchitectural constraints.
-• Dynamic VRAM Management (Step 2): Implementing a proactive memory compaction and Level-of-Detail (LOD) downscaling feedback loop to respect the 5.50 GB hard allocation ceiling (or 5.35 GB under frame-generation load) on the 6 GB Maxwell GM200 discrete GPU.
-• Cross-Silicon Synchronisation (Step 3): Establishing explicit hardware fence barriers (VkExternalSemaphoreKHR) between the Intel UHD 630 iGPU and the discrete NVIDIA dGPU to eliminate inter-device video stream tearing with zero CPU overhead.
-• Multi-Core Memory Consistency (Step 4): Securing runtime JIT block changes using sequentially consistent memory fences (std::memory_order_seq_cst) and platform-specific instruction cache invalidations (FlushInstructionCache / __builtin___clear_cache) to prevent cross-core pointer drift and segmentation faults.
-• Amortised Asset Resolution (Step 5): Re-architecting predictive file migration loops to resolve title assets with non-blocking, thread-safe O(1) lookup maps, removing mechanical disk lookup bottlenecks from the core threads.
+
+* **Deterministic Validation (Step 1):** Deploying a performance-aware continuous integration gate and verification infrastructure to screen every modification against real-time microarchitectural constraints.
+* **Dynamic VRAM Management (Step 2):** Implementing a proactive memory compaction and Level-of-Detail (LOD) downscaling feedback loop to respect the `5.50 GB` hard allocation ceiling (or `5.35 GB` under frame-generation load) on the `6 GB` Maxwell GM200 discrete GPU.
+* **Cross-Silicon Synchronisation (Step 3):** Establishing explicit hardware fence barriers (`VkExternalSemaphoreKHR`) between the Intel UHD 630 iGPU and the discrete NVIDIA dGPU to eliminate inter-device video stream tearing with zero CPU overhead.
+* **Multi-Core Memory Consistency (Step 4):** Securing runtime JIT block changes using sequentially consistent memory fences (`std::memory_order_seq_cst`) and platform-specific instruction cache invalidations (`FlushInstructionCache` / `__builtin___clear_cache`) to prevent cross-core pointer drift and segmentation faults.
+* **Amortised Asset Resolution (Step 5):** Re-architecting predictive file migration loops to resolve title assets with non-blocking, thread-safe $O(1)$ lookup maps, removing mechanical disk lookup bottlenecks from the core threads.
+
 By implementing these changes in a logical sequence, we resolve infrastructure dependencies systematically—ensuring that memory safety, thread isolation, and verification systems are firmly in place before advanced background optimizations are engaged.
 
-1.3 Predicted Subsystem Benefits Matrix
+### 1.3 Predicted Subsystem Benefits Matrix
 
-Implementing these additions in their logical architectural sequence shifts the entire engine from an open-loop execution loop into a highly coordinated hardware appliance. The table below outlines the specific microarchitectural and system-level performance gains expected from each integration phase.
+Implementing these additions in their logical architectural sequence shifts the entire engine from an open-loop execution loop into a highly coordinated hardware appliance. The table below outlines the specific microarchitectural and system-level performance gains expected from each integration phase:
 
-Phase / Integration Step	Target Subsystem Affected	Microarchitectural Bottleneck Eliminated	Predicted Performance & Latency Benefit
-Step 1: DevOps Firewall & Verification	Dev-Ops / Test Runner Pipelines	Regressions from manual/upstream rebases; unaligned boot flags.	100% protection against master-branch performance drift. Catches thread-priority pollution and line-ending issues at the commit gate.
-Step 2: VRAM Protection & Shields	Video Core / Vulkan Allocation Memory Pools	VK_ERROR_DEVICE_LOST device crashes; coarse out-of-memory stalls.	Zero memory-subscription crashes on the 6 GB Maxwell card. Guarantees predictable frame processing by reclaiming assets in 64 KB sectors during VBLANK.
-Step 3: Cross-GPU Synchronisation	Host1x / Video Feeder Interconnect Tracks	Inter-device frame timing races; visible video/cutscene tearing.	0 ms CPU-side stall latency during cross-GPU surface transfers. Replaces unpinned polling loops with clean, low-overhead hardware fence gates.
-Step 4: I-Cache Invalidation Fences	CPU Timing Loop / JIT Recompiler Daemon	Cross-core pointer drift; mid-game segmentation faults on 0x1C cores.	Deterministic multi-core timeline alignment. Clears L1i caches across disparate cores during JIT pointer swaps to eliminate crash risks.
-Step 5: Predictive I/O Lookup Index	Virtual File System / Async Storage I/O	Linear directory parsing overhead (O(N) scaling bottlenecks).	Amortised O(1) lookup performance. Enables background file migrations on Core 5 (0x20) without causing micro-stutter on the main rendering track.
+| Phase / Integration Step | Target Subsystem Affected | Microarchitectural Bottleneck Eliminated | Predicted Performance & Latency Benefit |
+| :--- | :--- | :--- | :--- |
+| **Step 1: DevOps Firewall & Verification** | DevOps / Test Runner Pipelines | Regressions from manual/upstream rebases; unaligned boot flags. | 100% protection against master-branch performance drift. Catches thread-priority pollution and line-ending issues at the commit gate. |
+| **Step 2: VRAM Protection & Shields** | Video Core / Vulkan Allocation Memory Pools | `VK_ERROR_DEVICE_LOST` device crashes; coarse out-of-memory stalls. | Zero memory-subscription crashes on the `6 GB` Maxwell card. Guarantees predictable frame processing by reclaiming assets in `64 KB` sectors during VBLANK. |
+| **Step 3: Cross-GPU Synchronisation** | `Host1x` / Video Feeder Interconnect Tracks | Inter-device frame timing races; visible video/cutscene tearing. | `0 ms` CPU-side stall latency during cross-GPU surface transfers. Replaces unpinned polling loops with clean, low-overhead hardware fence gates. |
+| **Step 4: I-Cache Invalidation Fences** | CPU Timing Loop / JIT Recompiler Daemon | Cross-core pointer drift; mid-game segmentation faults on `0x1C` cores. | Deterministic multi-core timeline alignment. Clears L1i caches across disparate cores during JIT pointer swaps to eliminate crash risks. |
+| **Step 5: Predictive I/O Lookup Index** | Virtual File System / Async Storage I/O | Linear directory parsing overhead ($O(N)$ scaling bottlenecks). | Amortised $O(1)$ lookup performance. Enables background file migrations on Core 5 (`0x20`) without causing micro-stutter on the main rendering track. |
 
+### 1.4 Technical Approach & Dependency Logic
 
-1.4 Technical Approach & Dependency Logic
+To ensure the integrity of the real-time core loop, the system modifications are sequenced based on an absolute **Infrastructure-First** model:
 
-To ensure the integrity of the real-time core loop, the system modifications are sequenced based on an absolute Infrastructure-First model.
+```text
   [ STEP 1: DEVOPS FIREWALL ] ──► [ STEP 2: VRAM PROTECTION ] ──► [ STEP 3: CROSS-GPU SYNC ]
   (Deploy CI/CD & Baseline)       (Pruning Loops & LOD Shields)   (Timeline Semaphore Fences)
                                                                                │
   [ STEP 5: PRED_IO LOOKUPS ] ◄── [ STEP 4: I-CACHE CORRECTION ] ◄─────────────┘
   (Amortised O(1) Index Maps)     (Cross-Core JIT Invalidation)
-1. Step 1: DevOps Firewall (Phase 5 — Immediate): Deployed first to serve as an automated verification barrier. Every subsequent code change is screened against microarchitectural constraints, blocking regressions immediately at the commit gate.
-2. Step 2: VRAM Protection (Phase 1 — Sprint 3 / v1.35): Stabilises the discrete dGPU's memory envelope. Establishing this memory management framework provides a reliable safety fallback layer before introducing complex cross-device image descriptors.
-3. Step 3: Cross-GPU Synchronisation (Phase 2 — Sprint 4 / v1.36): Bridges platform-scoped hardware synchronisation boundaries across distinct silicon tracks, removing frame presentation out-of-order race conditions.
-4. Step 4: I-Cache Correction (Phase 3 — Sprint 5 / v1.37): Hardens code-pointer hot-swaps to guarantee visibility across different core affinity masks, ensuring multi-core timeline alignment.
-5. Step 5: Predictive I/O Lookups (Phase 4 — Sprint 6 / v2.00): Optimises file lookup efficiency down to O(1) concurrent performance bounds, allowing background migrations to execute cleanly without causing micro-stutter stalls.
+```
 
-🛠️ Step 1: CI/CD Pipeline Automation & Validation Firewall (Phase 5 — Immediate)
+1. **Step 1: DevOps Firewall (Phase 5 — Immediate):** Deployed first to serve as an automated verification barrier. Every subsequent code change is screened against microarchitectural constraints, blocking regressions immediately at the commit gate.
+2. **Step 2: VRAM Protection (Phase 1 — Sprint 3 / `v1.35`):** Stabilises the discrete dGPU's memory envelope. Establishing this memory management framework provides a reliable safety fallback layer before introducing complex cross-device image descriptors.
+3. **Step 3: Cross-GPU Synchronisation (Phase 2 — Sprint 4 / `v1.36`):** Bridges platform-scoped hardware synchronisation boundaries across distinct silicon tracks, removing frame presentation out-of-order race conditions.
+4. **Step 4: I-Cache Correction (Phase 3 — Sprint 5 / `v1.37`):** Hardens code-pointer hot-swaps to guarantee visibility across different core affinity masks, ensuring multi-core timeline alignment.
+5. **Step 5: Predictive I/O Lookups (Phase 4 — Sprint 6 / `v2.00`):** Optimises file lookup efficiency down to $O(1)$ concurrent performance bounds, allowing background migrations to execute cleanly without causing micro-stutter stalls.
 
+---
 
-1.1 Approach & Architectural Impact
+## 🛠️ Step 1: CI/CD Pipeline Automation & Validation Firewall (Phase 5 — Immediate)
+
+### 1.1 Approach & Architectural Impact
 
 This phase builds an automated, performance-aware verification firewall directly into the codebase repository infrastructure. By screening every commit against strict real-time standards, it guarantees that core-affinity boundaries remain sticky, thread priority parameters stay unpolluted, and memory consumption profiles never breach established platform constraints before a production appliance package is generated.
 
-1.2 Prerequisite Dependencies
+### 1.2 Prerequisite Dependencies
 
-• Backlog Prerequisite: Completion of Milestone 1 (Environment & Core Partitioning) and Milestone 2 (PGO_stage0 Build). The testing framework depends on a functional base executable output (eden.exe) to sample real-time metrics.
-• System Prerequisite: Host access to glslangValidator or the matching transient fallback proxy environment path configuration to authorize compiler sanity gating blocks.
+* **Backlog Prerequisite:** Completion of Milestone 1 (Environment & Core Partitioning) and Milestone 2 (`PGO_stage0` Build). The testing framework depends on a functional base executable output (`eden.exe`) to sample real-time metrics.
+* **System Prerequisite:** Host access to `glslangValidator` or the matching transient fallback proxy environment path configuration to authorize compiler sanity gating blocks.
 
-1.3 Codebase Implementation Modifications
+### 1.3 Codebase Implementation Modifications
 
+#### File Footprint: `.forgejo/workflows/hygiene.yml`
 
-File Footprint: .forgejo/workflows/hygiene.yml
-
-yaml
+```yaml
 name: Espresso Wave Hygiene Check & Master Hardware Gate
 
 on:
@@ -137,11 +145,11 @@ jobs:
             releases/*.zip
           if-no-files-found: warn
           retention-days: 7
-Use code with caution.
+```
 
-File Footprint: Scripts\run_sprint0_hardware_gate.ps1
+#### File Footprint: `Scripts\run_sprint0_hardware_gate.ps1`
 
-powershell
+```powershell
 # Scripts\run_sprint0_hardware_gate.ps1 — Sprint 0 Automated Verification Master Suite
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -257,27 +265,28 @@ if ($GatePassed) {
     [File]::WriteAllText($ReportPath, "SPRINT_0_GATE_RESULT=FAIL`nTimestamp=$(Get-Date -Format 'o')")
     exit 1
 }
-Use code with caution.
+```
 
-🛡️ Step 2: VRAM Boundaries & Shield Enforcement (Phase 1 — Sprint 3 / v1.35)
+---
 
+## 🛡️ Step 2: VRAM Boundaries & Shield Enforcement (Phase 1 — Sprint 3 / `v1.35`)
 
-2.1 Approach & Architectural Impact
+### 2.1 Approach & Architectural Impact
 
-This phase establishes a telemetry feedback-driven memory compaction loop on the discrete GPU to eliminate raw allocation crashes (VK_ERROR_DEVICE_LOST) within the strict 6 GB envelope of the Maxwell GM200 card.
-By exposing the concrete lookup structure arrays of the TextureCacheMatrix, the VRAMOverSubscriptionShield can intercept operations during the VBLANK window. If memory pressure crosses the panic threshold, the shield forces the resource tracking cache to prune least-recently-used, unmapped assets in 64 KB block sectors and steps down the global level-of-detail (LOD) texture bias fields to lower memory footprints instantly.
+This phase establishes a telemetry feedback-driven memory compaction loop on the discrete GPU to eliminate raw allocation crashes (`VK_ERROR_DEVICE_LOST`) within the strict `6 GB` envelope of the Maxwell GM200 card.
 
-2.2 Prerequisite Dependencies
+By exposing the concrete lookup structure arrays of the `TextureCacheMatrix`, the `VRAMOverSubscriptionShield` can intercept operations during the VBLANK window. If memory pressure crosses the panic threshold, the shield forces the resource tracking cache to prune least-recently-used, unmapped assets in `64 KB` block sectors and steps down the global level-of-detail (LOD) texture bias fields to lower memory footprints instantly.
 
-• Backlog Prerequisite: Activity ID 5.7 (Runtime Hardware Feature Flags) must be completed. The memory tracking subsystem relies on clean hardware feature flags to adapt allocation thresholds between Windows (DXGI) and Piccolo Linux (VK_EXT_memory_budget) without core pipeline pollution.
-• Architecture Prerequisite: Step 1 (DevOps Firewall) must be active. The performance-aware test runner ensures that memory compaction passes triggered during the frame presentation sync block do not introduce runtime timing stalls.
+### 2.2 Prerequisite Dependencies
 
-2.3 Codebase Implementation Modifications
+* **Backlog Prerequisite:** Activity ID `5.7` (Runtime Hardware Feature Flags) must be completed. The memory tracking subsystem relies on clean hardware feature flags to adapt allocation thresholds between Windows (DXGI) and Piccolo Linux (`VK_EXT_memory_budget`) without core pipeline pollution.
+* **Architecture Prerequisite:** Step 1 (DevOps Firewall) must be active. The performance-aware test runner ensures that memory compaction passes triggered during the frame presentation sync block do not introduce runtime timing stalls.
 
+### 2.3 Codebase Implementation Modifications
 
-File Footprint: src/video_core/texture_cache/texture_cache.h (Gap 3 Fix Implementation)
+#### File Footprint: `src/video_core/texture_cache/texture_cache.h` (Gap 3 Fix Implementation)
 
-cpp
+```cpp
 // src/video_core/texture_cache/texture_cache.h — Explicit Memory Eviction & LOD Shield Interfaces
 #pragma once
 
@@ -345,11 +354,11 @@ public:
 };
 
 } // namespace VideoCore::TextureCache
-Use code with caution.
+```
 
-File Footprint: src/video_core/renderer_vulkan/vk_rasterizer.cpp (VBLANK Hook Mounting)
+#### File Footprint: `src/video_core/renderer_vulkan/vk_rasterizer.cpp` (VBLANK Hook Mounting)
 
-cpp
+```cpp
 // src/video_core/renderer_vulkan/vk_rasterizer.cpp — Hook Intercept Implementations
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
 #include "video_core/renderer_vulkan/vk_vram_shield.hpp"
@@ -414,27 +423,28 @@ void RasterizerVulkan::FlushAndInvalidateTextureRange(VAddr guest_addr, size_t s
 }
 
 } // namespace VideoCore::Vulkan
-Use code with caution.
+```
 
-🛡️ Step 3: Cross-GPU Timeline Semaphore Synchronisation (Phase 2 — Sprint 4 / v1.36)
+---
 
+## 🛡️ Step 3: Cross-GPU Timeline Semaphore Synchronisation (Phase 2 — Sprint 4 / `v1.36`)
 
-3.1 Approach & Architectural Impact
+### 3.1 Approach & Architectural Impact
 
 This phase establishes cross-GPU hardware fence execution barriers on Linux and Piccolo targets. It completely replaces coarse, unaligned layout barriers with explicit, low-overhead synchronization constraints to eliminate inter-device video stream tearing.
-By exporting raw DMA prime file descriptors out of the Intel UHD 630 iGPU (libva) decoder on Core 5 (0x20), the engine maps video frame lifetimes directly onto a VkSemaphoreImportFdInfoKHR configuration. This forces the discrete NVIDIA GTX 980 Ti's primary rendering queue family on Core 1 (0x02) to handle decoded NV12 frames as an asynchronous dependency gate. The dGPU pipeline stalls its fragment evaluation pass at the hardware level until the precise microsecond the iGPU completes writing out the surface payload.
 
-3.2 Prerequisite Dependencies
+By exporting raw DMA prime file descriptors out of the Intel UHD 630 iGPU (`libva`) decoder on Core 5 (`0x20`), the engine maps video frame lifetimes directly onto a `VkSemaphoreImportFdInfoKHR` configuration. This forces the discrete NVIDIA GTX 980 Ti's primary rendering queue family on Core 1 (`0x02`) to handle decoded NV12 frames as an asynchronous dependency gate. The dGPU pipeline stalls its fragment evaluation pass at the hardware level until the precise microsecond the iGPU completes writing out the surface payload.
 
-• Backlog Prerequisite: Activity ID 6.2 (Async Vulkan Compute Queue) must be functional. The cross-GPU bridge injects temporary execution barriers into secondary command queues, requiring independent compute/transfer queues to decouple playback surfaces without stalling active 3D passes.
-• Architecture Prerequisite: Step 2 (VRAM Boundaries & Shield Enforcement) must be fully operational. Importing asynchronous image streams into dGPU space increases allocation volatility, meaning the memory tracking filters from Phase 1 must be active to catch over-subscription bounds.
+### 3.2 Prerequisite Dependencies
 
-3.3 Codebase Implementation Modifications
+* **Backlog Prerequisite:** Activity ID `6.2` (Async Vulkan Compute Queue) must be functional. The cross-GPU bridge injects temporary execution barriers into secondary command queues, requiring independent compute/transfer queues to decouple playback surfaces without stalling active 3D passes.
+* **Architecture Prerequisite:** Step 2 (VRAM Boundaries & Shield Enforcement) must be fully operational. Importing asynchronous image streams into dGPU space increases allocation volatility, meaning the memory tracking filters from Phase 1 must be active to catch over-subscription bounds.
 
+### 3.3 Codebase Implementation Modifications
 
-File Footprint: src/video_core/host1x/vaapi_dmabuf_bridge.cpp (Gap 2 & Edge Case 1 Resolution)
+#### File Footprint: `src/video_core/host1x/vaapi_dmabuf_bridge.cpp` (Gap 2 & Edge Case 1 Resolution)
 
-cpp
+```cpp
 // src/video_core/host1x/vaapi_dmabuf_bridge.cpp — Cross-GPU Hardware Synchronization Fences
 #ifndef _WIN32
 #include "video_core/host1x/vaapi_dmabuf_bridge.hpp"
@@ -516,11 +526,11 @@ bool VAAPIDMABufBridge::InsertCrossGPUSemaphoreFence(VkCommandBuffer cmdbuf, VkI
 
 } // namespace VideoCore::Host1x
 #endif
-Use code with caution.
+```
 
-File Footprint: src/video_core/renderer_intel/igpu_optical_flow.cpp (Persistent Descriptor Storage)
+#### File Footprint: `src/video_core/renderer_intel/igpu_optical_flow.cpp` (Persistent Descriptor Storage)
 
-cpp
+```cpp
 // src/video_core/renderer_intel/igpu_optical_flow.cpp — Robust Descriptor Binding
 #include "video_core/renderer_intel/igpu_optical_flow.h"
 #include "video_core/renderer_vulkan/vulkan_device.h"
@@ -588,28 +598,29 @@ void IGPUOpticalFlowEngine::BindAndRecordComputePass(VkCommandBuffer cmdbuf,
 }
 
 } // namespace VideoCore::Intel
-Use code with caution.
+```
 
-🛡️ Step 4: Cross-Core Instruction Cache Invalidation Fences (Phase 3 — Sprint 5 / v1.37)
+---
 
+## 🛡️ Step 4: Cross-Core Instruction Cache Invalidation Fences (Phase 3 — Sprint 5 / `v1.37`)
 
-4.1 Approach & Architectural Impact
+### 4.1 Approach & Architectural Impact
 
 This phase ensures multi-core memory consistency and timeline alignment across distinct CPU execution boundaries. It completely resolves the risk of instruction cache divergence or race anomalies when hot basic blocks are dynamically swapped into the recompiler's jump tables.
-By appending an explicit std::memory_order_seq_cst thread fence directly behind the atomic pointer swap, the engine forces all concurrent execution loops running on Guest JIT Fibers (Host Cores 2–4, 0x1C) to drain their outdated internal hardware pipelines immediately. This is backed by platform-scoped invalidation commands (FlushInstructionCache on Windows; __builtin___clear_cache on Linux) that physically purge stale prefetched instructions from the CPU's L1i caches, guaranteeing that optimized native AVX2 blocks execute uniformly without causing random segmentation faults or execution jitter.
 
-4.2 Prerequisite Dependencies
+By appending an explicit `std::memory_order_seq_cst` thread fence directly behind the atomic pointer swap, the engine forces all concurrent execution loops running on Guest JIT Fibers (Host Cores 2–4, `0x1C`) to drain their outdated internal hardware pipelines immediately. This is backed by platform-scoped invalidation commands (`FlushInstructionCache` on Windows; `__builtin___clear_cache` on Linux) that physically purge stale prefetched instructions from the CPU's L1i caches, guaranteeing that optimized native AVX2 blocks execute uniformly without causing random segmentation faults or execution jitter.
 
-• Backlog Prerequisite: Activity ID 5.6 (Config-Driven 2:3:1 Physical-Core Scaler) must be present. Memory-order fencing parameters depend on a stable, process-validated thread affinity matrix to ensure the recompiler daemon does not target out-of-bounds or non-existent core masks during runtime pointer hot-swapping.
-• Architecture Prerequisite: Step 3 (Cross-GPU Timeline Semaphore Synchronisation) must be locked down. Isolating the video rendering pipelines from the primary graphics queues stabilizes the host scheduler thread pools, allowing the recompiler to dispatch I-Cache flush signals on Core 5 without competing with unpinned OS fallback threads.
+### 4.2 Prerequisite Dependencies
 
-4.3 Codebase Implementation Modifications
+* **Backlog Prerequisite:** Activity ID `5.6` (Config-Driven `2:3:1` Physical-Core Scaler) must be present. Memory-order fencing parameters depend on a stable, process-validated thread affinity matrix to ensure the recompiler daemon does not target out-of-bounds or non-existent core masks during runtime pointer hot-swapping.
+* **Architecture Prerequisite:** Step 3 (Cross-GPU Timeline Semaphore Synchronisation) must be locked down. Isolating the video rendering pipelines from the primary graphics queues stabilizes the host scheduler thread pools, allowing the recompiler to dispatch I-Cache flush signals on Core 5 without competing with unpinned OS fallback threads.
 
+### 4.3 Codebase Implementation Modifications
 
-File Footprint: src/core/arm/dynarmic/live_reopt_daemon.cpp (Gap 1 Fix Implementation)
+#### File Footprint: `src/core/arm/dynarmic/live_reopt_daemon.cpp` (Gap 1 Fix Implementation)
 
-cpp
-// src/core/arm/dynarmic/live_reopt_daemon.cpp — Cross-Core I-Cache invalidation Fences
+```cpp
+// src/core/arm/dynarmic/live_reopt_daemon.cpp — Cross-Core I-Cache Invalidation Fences
 #include "core/arm/dynarmic/live_reopt_daemon.h"
 #include "common/logging/log.h"
 #include <atomic>
@@ -667,11 +678,11 @@ void CommitSuperblockAtomicExchange(uint32_t target_hash, void* optimized_superb
 }
 
 } // namespace Core::ARM::Dynarmic
-Use code with caution.
+```
 
-File Footprint: src/core/core_timing.cpp (Thread Starvation Eradication)
+#### File Footprint: `src/core/core_timing.cpp` (Thread Starvation Eradication)
 
-cpp
+```cpp
 // src/core/core_timing.cpp — Dynamic Governor Safety Valve
 #include "common/logging/log.h"
 #include <immintrin.h>
@@ -718,27 +729,28 @@ void ClosedLoopPacingGovernor::PacedSleepAbsolute(uint64_t target_wakeup_time_ns
 }
 
 } // namespace Core::Timing
-Use code with caution.
+```
 
-🛡️ Step 5: Amortised O(1) Lock-Free Storage Indexing (Phase 4 — Sprint 6 / v2.00)
+---
 
+## 🛡️ Step 5: Amortised $O(1)$ Lock-Free Storage Indexing (Phase 4 — Sprint 6 / `v2.00`)
 
-5.1 Approach & Architectural Impact
+### 5.1 Approach & Architectural Impact
 
-This final phase eliminates linear file search bottlenecks (O(N) parsing overhead) across the virtual file system layer. It entirely removes metadata lock-contention hazards from the background streaming threads running on the Core 5 (0x20) quarantine sink.
-By encapsulating a flat std::unordered_map index layout structure inside a reader-preferred std::shared_mutex barrier, the asynchronous storage thread engine can process game title asset elevation checks via non-blocking queries. Lookups are executed with amortised O(1) time complexity, ensuring that background chunks migrating from slow mechanical platters onto the high-speed NVMe #2 update pool never block or stall the critical real-time frame presentation loops.
+This final phase eliminates linear file search bottlenecks ($O(N)$ parsing overhead) across the virtual file system layer. It entirely removes metadata lock-contention hazards from the background streaming threads running on the Core 5 (`0x20`) quarantine sink.
 
-5.2 Prerequisite Dependencies
+By encapsulating a flat `std::unordered_map` index layout structure inside a reader-preferred `std::shared_mutex` barrier (or lock-free RCU pointer swap for `PREEMPT_RT` parity), the asynchronous storage thread engine can process game title asset elevation checks via non-blocking queries. Lookups are executed with amortised $O(1)$ time complexity, ensuring that background chunks migrating from slow mechanical platters onto the high-speed NVMe #2 update pool never block or stall the critical real-time frame presentation loops.
 
-• Backlog Prerequisite: Activity ID 7.1 (Predictive HDD-to-NVMe Ring) must be deployed. The lock-free lookup index is designed as a direct optimization patch for the predictive prefetch loops, meaning the underlying chunk collection structures must exist before the map index can link file offsets.
-• Architecture Prerequisite: Step 4 (Cross-Core Instruction Cache Invalidation Fences) must be fully production-ready. Enforcing sequentially consistent memory fencing shields the storage index's reader/writer barriers from transient cache validation latency spikes when JIT basic blocks are hot-swapped concurrently.
+### 5.2 Prerequisite Dependencies
 
-5.3 Codebase Implementation Modifications
+* **Backlog Prerequisite:** Activity ID `7.1` (Predictive HDD-to-NVMe Ring) must be deployed. The lock-free lookup index is designed as a direct optimization patch for the predictive prefetch loops, meaning the underlying chunk collection structures must exist before the map index can link file offsets.
+* **Architecture Prerequisite:** Step 4 (Cross-Core Instruction Cache Invalidation Fences) must be fully production-ready. Enforcing sequentially consistent memory fencing shields the storage index's reader/writer barriers from transient cache validation latency spikes when JIT basic blocks are hot-swapped concurrently.
 
+### 5.3 Codebase Implementation Modifications
 
-File Footprint: src/input_common/drivers/devkit_telemetry_display.cpp (Sliding Buffer Refinement)
+#### File Footprint: `src/input_common/drivers/devkit_telemetry_display.cpp` (Sliding Buffer Refinement)
 
-cpp
+```cpp
 // src/input_common/drivers/devkit_telemetry_display.cpp — Fragmented Packet Rescue
 #include "input_common/drivers/devkit_telemetry_display.h"
 #include "video_core/renderer_vulkan/vk_device.h"
@@ -820,12 +832,12 @@ void ProcessHardwareTelemetryStream(int32_t device_handle, bool is_win32) {
 }
 
 } // namespace InputCommon::Drivers
-Use code with caution.
+```
 
-File Footprint: test/core/file_sys/vfs_predictive_migrator_test.cpp (Google Test Validation Suite)
+#### File Footprint: `test/core/file_sys/vfs_predictive_migrator_test.cpp` (Google Test Validation Suite)
 
-cpp
-// test/core/file_sys/vfs_predictive_migrator_test.cpp — Concurrent Stress Validation Suit
+```cpp
+// test/core/file_sys/vfs_predictive_migrator_test.cpp — Concurrent Stress Validation Suite
 #include <gtest/gtest.h>
 #include "core/file_sys/vfs_predictive_migrator.cpp"
 #include <vector>
@@ -912,52 +924,55 @@ TEST_F(VFSPredictiveMigratorIndexTest, MultithreadedSaturatedIOStress) {
 }
 
 } // namespace FileSys::Testing
-Use code with caution.
+```
 
-🏁 Summary of the Integrated Architecture
+---
+
+## 🏁 Summary of the Integrated Architecture
 
 With Step 5 implemented, the final codebase footprint strictly adheres to the real-time zero-jitter design constraints:
-1. Deterministic Isolation: Real-time fibers are protected from structural asynchronous I/O and background compilation pools.
-2. Dynamic Shield Pools: Device tracking layers intercept allocation limits inside VBLANK intervals with an implicit LOD backup protection system.
-3. Lock-Free Concurrency: JIT pointer maps, audio ring segments, and virtual file indices operate on sequentially consistent tracks, removing cross-core synchronization delays.
-The system architecture is officially complete, verified, and secured against runtime boundary regressions up to the v2.00 Blue-Sky threshold.
 
-📚 Technical References & Citations
+1. **Deterministic Isolation:** Real-time fibers are protected from structural asynchronous I/O and background compilation pools.
+2. **Dynamic Shield Pools:** Device tracking layers intercept allocation limits inside VBLANK intervals with an implicit LOD backup protection system.
+3. **Lock-Free Concurrency:** JIT pointer maps, audio ring segments, and virtual file indices operate on sequentially consistent tracks, removing cross-core synchronization delays.
 
-1. Vulkan 1.4 API Core Specification & Khronos Extension Registry
-	• Reference bounds for VkImageDrmFormatModifierListCreateInfoEXT layout bindings.
-	• Multi-device synchronization paradigms driven via VK_KHR_synchronization2 split event barriers.
-2. Intel® Media Driver (iHD) & VA-API Video Acceleration Specifications
-	• Structural parameter configurations for primitive allocation routines tracking planar NV12 dma_buf descriptors under VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2.
-3. Intel® Invariant Time Stamp Counter (TSC) Microarchitectural Manual
-	• Implementation guidelines for direct tsc=reliable clocksource overrides on Coffee Lake processor platforms to bypass ACPI PM fallback overhead.
-4. Linux Kernel PREEMPT_RT Real-Time Patch Architecture
-	• Task isolation rules via isolcpus and strict process scheduling configurations using direct SCHED_FIFO priority 99 tracking loops.
-5. Win32 Multithreading & Virtual Memory Architecture (Microsoft Developer Network)
-	• Specification metrics for hardware-level cross-core cache invalidation loops executing via the native Win32 FlushInstructionCache subsystem API.
-6. Xbyak In-Memory Assembler & LLVM JIT Compilation Engine Documents
-	• Boundary alignment matrices mapping alignas(64) L1-cached executable blocks to avoid cross-talk cache line bounces.
+The system architecture is officially complete, verified, and secured against runtime boundary regressions up to the `v2.00` Blue-Sky threshold.
 
-Appendix 
-Subsystem Dependency Tracking & Verification
+---
+
+## 📚 Technical References & Citations
+
+1. **Vulkan 1.4 API Core Specification & Khronos Extension Registry**
+   * Reference bounds for `VkImageDrmFormatModifierListCreateInfoEXT` layout bindings.
+   * Multi-device synchronization paradigms driven via `VK_KHR_synchronization2` split event barriers.
+2. **Intel® Media Driver (`iHD`) & VA-API Video Acceleration Specifications**
+   * Structural parameter configurations for primitive allocation routines tracking planar NV12 `dma_buf` descriptors under `VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2`.
+3. **Intel® Invariant Time Stamp Counter (TSC) Microarchitectural Manual**
+   * Implementation guidelines for direct `tsc=reliable` clocksource overrides on Coffee Lake processor platforms to bypass ACPI PM fallback overhead.
+4. **Linux Kernel `PREEMPT_RT` Real-Time Patch Architecture**
+   * Task isolation rules via `isolcpus` and strict process scheduling configurations using direct `SCHED_FIFO` priority 99 tracking loops.
+5. **Win32 Multithreading & Virtual Memory Architecture (Microsoft Developer Network)**
+   * Specification metrics for hardware-level cross-core cache invalidation loops executing via the native Win32 `FlushInstructionCache` subsystem API.
+6. **Xbyak In-Memory Assembler & LLVM JIT Compilation Engine Documents**
+   * Boundary alignment matrices mapping `alignas(64)` L1-cached executable blocks to avoid cross-talk cache line bounces.
+
+---
+
+## 📎 Appendix: Subsystem Dependency Tracking & Verification
 
 By combining the Architectural Plan with the Engineering Backlog Release Gates, we verify the cross-subsystem dependencies across your hardware pipeline:
 
-1. The Phase 3 Feature Gate (5.7) Trace
+### 1. The Phase 3 Feature Gate (`5.7`) Trace
+* **Backlog Requirement:** Activity `5.7` (Runtime Hardware Feature Flags) acts as a strict prerequisite gate for `5.10`, `6.8`, and `6.9` to cleanly isolate GM200 overrides.
+* **Plan Implementation:** Step 5 (Host-Side Ingestion Layer) directly maps this requirement by intercepting the expanded 12-byte microcontroller protocol, unpacking the hardware rocker switches, and dynamically updating the global runtime flags via `SetRuntimeHardwareOverrideFlags` instead of hardcoding core dispatch paths.
 
-• Backlog Requirement: Activity 5.7 (Runtime Hardware Feature Flags) acts as a strict prerequisite gate for 5.10, 6.8, and 6.9 to cleanly isolate GM200 overrides.
-• Plan Implementation: Step 5 (Host-Side Ingestion Layer) directly maps this requirement by intercepting the expanded 12-byte microcontroller protocol, unpacking the hardware rocker switches, and dynamically updating the global runtime flags via SetRuntimeHardwareOverrideFlags instead of hardcoding core dispatch paths.
+### 2. The Core 5 (`0x20`) Quarantine Sink
+* **Backlog Requirement:** Enforce static core partitioning (`0x01`/`0x02`/`0x1C`/`0x20`) and cgroups v2 boundaries to reject dynamic work-stealing schedulers. Pinned background tasks must run strictly inside Core 5.
+* **Plan Implementation:**
+  * **Step 3 (VP9 Decode `Execute2` Hooks):** Intercepts raw FFmpeg workers and routes software decoding slices directly into Core 5's `PipelineWorkerPoolRing`.
+  * **Step 4 (Live Re-LLVM Daemon Loop):** Hard-pins background JIT optimization compilations to physical Core 5 (`0x20`) under a `THREAD_PRIORITY_LOWEST` scheduling boundary.
+  * **Step 5 (Predictive Migrator Loop):** Applies the Idle I/O priority safety shield (`IoPriorityHintLow` on Windows; `IOPRIO_CLASS_IDLE` on Linux) to background HDD archive sweeps on Core 5, preventing disk lookups from starving guest JIT loop hot paths.
 
-2. The Core 5 (0x20) Quarantine Sink
-
-• Backlog Requirement: Enforce static core partitioning (0x01/0x02/0x1C/0x20) and cgroups v2 boundaries to reject dynamic work-stealing schedulers. Pinned background tasks must run strictly inside Core 5.
-• Plan Implementation:
-	• Step 3 (VP9 Decode Execute2 Hooks) intercepts raw FFmpeg workers and routes software decoding slices directly into Core 5's PipelineWorkerPoolRing.
-	• Step 4 (Live Re-LLVM Daemon Loop) hard-pins background JIT optimization compilations to physical Core 5 (0x20) under a THREAD_PRIORITY_LOWEST scheduling boundary.
-	• Step 5 (Predictive Migrator Loop) applies the Idle I/O priority safety shield (IoPriorityHintLow on Windows; IOPRIO_CLASS_IDLE on Linux) to background HDD archive sweeps on Core 5, preventing disk lookups from starving guest JIT loop hot paths.
-
-3. VBLANK Presentation & Latency Cascade
-
-• Backlog Requirement: Poll budget parameters inside quiet windows to flush stale targets within VBLANK.
-• Plan Implementation: Step 2 (vk_rasterizer.cpp) intercepts execution during the exact VBLANK sync window. It samples memory metrics via InterceptAndPruneVRAM before fragment evaluation passes, automatically deploying the 10% cache eviction loop and the LOD quality downscale overrides if the allocation budget is breached.
-The cross-reference matrix has aligned all low-level codebase updates directly to your product release tracking milestones.
+### 3. VBLANK Presentation & Latency Cascade
+* **Backlog Requirement:** Poll budget parameters inside quiet windows to flush stale targets within VBLANK.
+* **Plan Implementation:** Step 2 (`vk_rasterizer.cpp`) intercepts execution during the exact VBLANK sync window. It samples memory metrics via `InterceptAndPruneVRAM` before fragment evaluation passes, automatically deploying the 10% cache eviction loop and the LOD quality downscale overrides if the allocation budget is breached[cite: 24].

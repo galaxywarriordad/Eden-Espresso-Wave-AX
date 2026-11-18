@@ -390,6 +390,18 @@ endif()
 
 AddJsonPackage(nlohmann)
 
+# =======================================================================
+# AX-SDK (Shared C++20 Silicon Core & Topology)
+# =======================================================================
+include(FetchContent)
+FetchContent_Declare(
+    ax_sdk
+    GIT_REPOSITORY https://github.com/galaxywarriordad/ax-sdk.git
+    GIT_TAG        v1.35.0
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(ax_sdk)
+
 if (NOT YUZU_STATIC_ROOM)
     AddJsonPackage(zlib)
     if (ZLIB_ADDED)
@@ -601,6 +613,11 @@ if (MSVC AND CXX_CLANG)
 endif()
 # =======================================================================
 add_subdirectory(src)
+
+if (TARGET core AND TARGET ax::core)
+    target_link_libraries(core PRIVATE ax::core)
+    message(STATUS "[AX-SDK] Linked ax::core (v1.35.0) into core engine target.")
+endif()
 
 if (ENABLE_DEBUG_TOOLS)
     add_subdirectory(tools/maxwell-disas)
