@@ -1,11 +1,11 @@
-# ☕ Eden Espresso Wave [AX] — Master v1.34 / v1.35 Ready
+## ☕ Eden Espresso Wave [AX] — Master v1.34 / v1.35 Ready
 
 A deterministic, hardware-locked fork of the Eden Nintendo Switch Emulator engineered for Intel Coffee Lake Refresh, NVIDIA Maxwell/Pascal GPUs, Intel Quick Sync Video, and bit-perfect exclusive USB DAC audio.
 Eden Espresso Wave [AX] — Elevating Nintendo Switch Emulation to Professional Hardware Parity
 Overview:
 Eden Espresso Wave [AX] is a high-fidelity, performance-optimized Nintendo Switch emulator engine designed from the ground up as a deterministic, hardware-conscious appliance. Rather than treating emulation as a generic desktop process, it transforms your PC into a focused, finely tuned gaming platform carefully aligned with your system's hardware topology.
 
-Technical Highlights:
+# Technical Highlights:
 
 Hardware-locked execution: Utilizes a 2:3:1 core partitioning strategy on Intel Coffee Lake CPUs, pinning critical threads like audio processing, Vulkan command submission, and background shader compilation to dedicated cores for minimal jitter and predictable timing.
 Optimized Vulkan pipelines: Implements vendor-aware shader compilation guards, VRAM budgeting and protection, and advanced texture compression strategies tailored to Maxwell GPUs such as the GTX 980 Ti.
@@ -13,10 +13,11 @@ Real-time telemetry & profiling: Integrates native Vulkan telemetry overlays and
 Advanced audio integration: Employs FlexASIO and Steinberg ASIO drivers with lock-free ring buffers and micro-pitch PLL via low-latency exclusive hardware access, eliminating audio underruns and crackles.
 Layered build pipeline: Features a rigorous multi-stage Profile-Guided Optimization (PGO) process coupled with extensive CI/CD hygiene gates and hardware validation suites, ensuring binary integrity and deterministic performance across PC configurations.
 Cross-silicon offloading: Seamlessly offloads video decoding to Intel UHD graphics and plans sophisticated GPU compute for ASTC texture decompression and frame generation acceleration.
-User Focus:
+
+# User Focus:
 Eden Espresso Wave [AX] is more than just code. It prioritizes a smooth, stutter-free gaming experience with simple, guided setup instructions. It enforces legal use of features like frame interpolation through Steam’s Lossless Scaling, ensuring a clean and ethical delivery.
 
-Vision:
+# Vision:
 This project pioneers the path toward a dedicated, bare-metal gaming appliance, exemplified by Eden Piccolo [AX], a fully optimized Linux USB boot environment delivering near-zero latency and consistent sub-millisecond frame pacing.
 ## 🔗 Official Repository Network
 * **Main Development Repository:** [Eden Forgejo Server](https://git.eden-emu.dev/galaxywarriordad/Eden-Espresso-Wave-AX.git)
