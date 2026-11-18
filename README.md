@@ -141,8 +141,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "Scripts\clean_all.ps1" && P
 powershell -NoProfile -ExecutionPolicy Bypass -File "Scripts\validate_profile.ps1"
 PGO_stage2.bat
 
-## 🏛️ About The Silicon Preservation Society
-
+# 🏛️ About The Silicon Preservation Society
 The Silicon Preservation Society focuses on hardware preservation and extending the lifespan of aging desktop hardware through specialised software and toolsets, including Espresso Wave, Piccolo, and ax-sdk.
 If this mission is important to you and you would like to help, please open a GitHub Discussion or Issue on our repository—we would love to hear from you!
 **We refuse to throw away good hardware.**
