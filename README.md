@@ -132,7 +132,6 @@ Monitored in real-time by `Scripts\track_telemetry.ps1`[cite: 2]:
 
 ## 🚀 Quick Build, PGO & Automated Pipeline Architecture
 
-```cmd
 :: 1. Unified Automated Build Orchestrator (Stages 0-2 & Packaging)
 powershell -NoProfile -ExecutionPolicy Bypass -File "Scripts\build_all.ps1"
 
@@ -141,8 +140,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "Scripts\clean_all.ps1" && P
 powershell -NoProfile -ExecutionPolicy Bypass -File "Scripts\clean_all.ps1" && PGO_stage1.bat
 powershell -NoProfile -ExecutionPolicy Bypass -File "Scripts\validate_profile.ps1"
 PGO_stage2.bat
-```[cite: 2]
-<div align="center">
 
 ## 🏛️ About The Silicon Preservation Society
 
