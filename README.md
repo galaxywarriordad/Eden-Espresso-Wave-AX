@@ -70,17 +70,16 @@ The **AX Project** separates shared low-level C++20 silicon abstractions from pl
 * [Linux Appliance Specification (`Piccolo-AX`)](https://github.com/galaxywarriordad/Piccolo-AX/blob/main/docs/PICOLLO_AX_SPEC.md)
 
 ---
-
 ## 🗂️ Logical Documentation Hierarchy & Architecture Stack
 
 The documentation suite follows a progressive disclosure model—moving from high-level project identity down to low-level silicon specifications and future engineering roadmaps:
 
-* **Tier 1 — Core Navigation & Overview (`README.md`):** Entry point for developers, contributors, and users covering project vision, reference silicon specifications, elastic `2:3:1` topology, live atomic telemetry metrics, and build quickstarts.
-* **Tier 2 — User Operations & Deployment (`USER_GUIDE.md`):** Operational manual for environment setup, `FlexASIO.toml` bit-perfect audio calibration, NVIDIA Control Panel overrides, `Scripts\set_irq_affinity.ps1` IRQ steering, and the 3-stage LLVM PGO workflow (`PGO_configurator.bat`).
-* **Tier 3 — Low-Level Architecture & Silicon Specification (`ARCHITECTURE_SPEC.md`):** Engineering reference detailing macro data-flow topology diagrams, `SeLockMemoryPrivilege` 2 MB Large Pages, BMI1 `_bextr_u64` page walks, user-mode fiber scheduling, Core 0 MMCSS audio routing, and Maxwell GM200 safety guards.
-* **Tier 4 — Configuration & Technical Reference (`ADDITIONAL_DETAILS.md` & `eden_engine.ini`):** Granular configuration schemas, proportional `2:3:1` scaler parameters, shader macro harmonization (`macro_update.ps1` / `shader_validate.ps1`), and LLVM `clang-cl` 23+ ABI guards.
-* **Tier 5 — Shared Silicon & Cross-Platform Specs (`ax-sdk` & `Piccolo-AX`):** Cross-emulator C++20 shims, dynamic Intel SMT / AMD CCX core topology (`topology.cpp`), `< 300 MB` `toram` Batocera Buildroot overlay, and comparative industry benchmarks[cite: 13, 14, 15, 16, 21, 29].
-
+- **Tier 1 — Core Navigation & Overview (`README.md`):** Entry point for developers, contributors, and users covering project vision, reference silicon specifications, elastic `2:3:1` topology, live atomic telemetry metrics, and build quickstarts.
+- **Tier 2 — User Operations & Deployment (`USER_GUIDE.md`):** Operational manual for environment setup, `FlexASIO.toml` bit-perfect audio calibration, NVIDIA Control Panel overrides, `Scripts\set_irq_affinity.ps1` IRQ steering, and the 3-stage LLVM PGO workflow (`PGO_configurator.bat`).
+- **Tier 3 — Hardware & Audio Integration Guides (`src/audio_core/ASIO_cpp_guide.md`):** Comprehensive engineering reference for the ESS Sabre DAC (`libusb-1.0`) and Steinberg ASIO SDK ultra-low-latency real-time streaming bridge.
+- **Tier 4 — Low-Level Architecture & Silicon Specification (`ARCHITECTURE_SPEC.md`):** Engineering reference detailing macro data-flow topology diagrams, `SeLockMemoryPrivilege` 2 MB Large Pages, BMI1 `_bextr_u64` page walks, user-mode fiber scheduling, Core 0 MMCSS audio routing, and Maxwell GM200 safety guards.
+- **Tier 5 — Configuration & Technical Reference (`ADDITIONAL_DETAILS.md` & `eden_engine.ini`):** Granular configuration schemas, proportional `2:3:1` scaler parameters, shader macro harmonization (`macro_update.ps1` / `shader_validate.ps1`), and LLVM `clang-cl` 23+ ABI guards.
+- **Tier 6 — Shared Silicon & Cross-Platform Specs (`ax-sdk` & `Piccolo-AX`):** Cross-emulator C++20 shims, dynamic Intel SMT / AMD CCX core topology (`topology.cpp`), `< 300 MB` `toram` Batocera Buildroot overlay, and comparative industry benchmarks.
 ---
 
 ## 🔄 Recommended Reading & Workflow Sequence

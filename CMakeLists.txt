@@ -393,12 +393,13 @@ AddJsonPackage(nlohmann)
 # =======================================================================
 # AX-SDK (Shared C++20 Silicon Core & Topology)
 # =======================================================================
-include(FetchContent)
 FetchContent_Declare(
     ax_sdk
     GIT_REPOSITORY https://github.com/galaxywarriordad/ax-sdk.git
-    GIT_TAG        v1.35.0
-    GIT_SHALLOW    TRUE
+    GIT_TAG        v1_35_0
+    # CMake 4.x defaults GIT_SHALLOW to TRUE for tag-like refs (--depth 1), which omits
+    # annotated GitHub release tags from the shallow packfile and breaks tag checkout.
+    GIT_SHALLOW    FALSE
 )
 FetchContent_MakeAvailable(ax_sdk)
 

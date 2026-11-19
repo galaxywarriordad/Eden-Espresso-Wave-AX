@@ -73,11 +73,11 @@ The OSD renders crisp telemetry text directly into the active swapchain render p
 * **Vertex Buffer Staging:** Per-frame text strings (`telemetry_osd.cpp`) are formatted, converted into character quad vertices (2 triangles / 6 vertices per character), mapped to host-visible memory, and drawn via `vkCmdDraw` inside the active render pass.
 
 ### 2.5 Multi-Stage Profile-Guided Optimization (PGO)
-Eden utilizes a rigorous 3-stage PGO build pipeline to linearize hot-path code blocks and optimize instruction cache locality:
+Eden utilizes a rigorous multi-stage PGO build pipeline orchestrated from **`PGO_config.bat`** to linearize hot-path code blocks and optimize instruction cache locality:
 
-* **Stage 0LD (`PGO_stage0LD.bat`):** Compiles the modified baseline code and verifies basic telemetry and thread affinities.
-* **Stage 1 (`PGO_stage1.bat`):** Builds an instrumented binary and executes standardized 15-minute training sweeps across base (`v0`) test titles while tracking runtime telemetry.
-* **Stage 2 (`PGO_stage2.bat`):** Merges profiling data (`.pgc`) and compiles the final, L1i-linearized high-performance production binary.
+* **Stage 0 / Stage 0LD (`PGO_stage0.bat` & `PGO_stage0LD.bat`):** Compiles the modified baseline code, stages `eden_engine.ini` and `FlexASIO.toml` into `%BUILD_DIR%\bin\`, and verifies basic telemetry (`Scripts\track_telemetry.ps1`) and P-core affinities (`ax::topology`).
+* **Stage 1 (`PGO_stage1.bat`):** Builds an instrumented binary (`-fprofile-instr-generate`) and executes standardized 15-minute training sweeps across base (`v0`) test titles while tracking runtime telemetry.
+* **Stage 2 (`PGO_stage2.bat`):** Validates `.profraw` traces via `Scripts\validate_profile.ps1`, merges profiling data into `default.profdata` via `llvm-profdata`, and compiles the final, L1i-linearized high-performance production binary (`-fprofile-use`).
 
 ---
 

@@ -76,9 +76,9 @@ When pairing a GTX 980 Ti (GM200 Maxwell) with Eden Espresso Wave [AX], several 
 
 * **Compute Shader ASTC Decoding vs. CPU Decoding:** The GTX 980 Ti has massive raw FP32/INT32 shader throughput (`~6.0+ TFLOPS`) compared to entry-level Maxwell cards, while the Switch uses hardware ASTC textures that GM200 lacks fixed-function hardware for. Offloading ASTC texture decompression to GPU Compute Shaders on the 980 Ti's 2,816 CUDA cores—rather than decoding them on the 6-core Coffee Lake CPU—frees substantial CPU headroom on your `2:3:1` pinned cores while barely denting the 980 Ti's GPU load.
 
-### Summary Priority List for a GTX 980 Ti
+### Summary Priority List & Implementation Status (`Master v1.35`)
 
-1. **Enable GPU Compute ASTC Decoding** (leveraging GM200's 2,816 CUDA cores to protect CPU frame times).
-2. **Relax Maxwell VRAM Caps** in `eden_engine.ini` / driver settings to utilise the full `6 GB` GDDR5 pool.
-3. **Use Dedicated DMA Transfer Queues & Split Barriers (`synchronization2`)** to overlap texture uploads with 3D rendering.
-4. **Promote Switch FP16 to Native FP32** where driver half-precision emulation bottlenecks GM200 ALUs[cite: 25].
+1. **Enable GPU Compute ASTC Decoding** (leveraging GM200's 2,816 CUDA cores to protect CPU frame times, with Core 5 AVX2 fallback when `lsfg-vk` is active).
+2. **`[IMPLEMENTED in v1.35]` Proactive `5.00 GiB` Async VRAM Shield (`ax::vram` + `VkVramShield`):** Triggers non-blocking background pruning at `5.00 GiB` (`~4.50 GiB` hysteresis recovery) ahead of the `5.50 GiB` (`5.35 GiB` LSFG) hard ceiling so the GTX 980 Ti utilizes its full `6 GB` GDDR5 pool without WDDM/NVIDIA system-RAM paging stalls.
+3. **`[IMPLEMENTED in v1.35]` Dedicated `VK_QUEUE_TRANSFER_BIT` & Vulkan 1.4 Split Barriers (`vkCmdSetEvent2` / `vkCmdWaitEvents2`):** Discovers GM200's dedicated hardware DMA copy queue (`vulkan_device.cpp`) and uses Synchronization2 split barriers (`ALL_GRAPHICS_BIT` → `TRANSFER_BIT`) + a `VK_KHR_timeline_semaphore`-fenced Core 5 reaper (`vk_vram_shield.hpp`) to eliminate VBLANK eviction stalls.
+4. **Promote Switch FP16 to Native FP32** where driver half-precision emulation bottlenecks GM200 ALUs (`emit_spirv.cpp` Activity `5.10`).

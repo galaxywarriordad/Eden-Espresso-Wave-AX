@@ -46,7 +46,42 @@ VulkanDriverPriorityClass=HIGH
 GuestExecutionPriorityClass=ABOVENORMAL
 AuxQuarantinePriorityClass=BELOWNORMAL
 ```
-
+Supplementary Engineering Reference (Master v1.35)
+Updated: 2026-11-19
+Captures low-level INI schemas, ax-sdk v1.35.0 runtime contracts (5.00 GiB async VRAM shield, GetLogicalProcessorInformationEx / sysfs 2:3:1 P-core scaler), LLVM/Clang-cl 23+ & MSVC 14.51+ ABI guards, shader preprocessor rules, telemetry internals, and PowerShell/Batch automation specifications.
+---
+## 1. eden_engine.ini Runtime Configuration Schema
+eden_engine.ini provides an external, cross-platform runtime control layer (shared by Windows desktop and Eden Piccolo [AX]) for thread-affinity enforcement, proportional physical-core scaling, Win32 scheduling classes, and hardware capability overrides without recompiling:
+```ini
+[EngineTopology]
+; Enforces hard-locked thread affinity mapping boundaries if hardware permits
+EnableThreadAffinityMasks=true
+; Clamps guest execution environment variables gracefully below physical ceilings
+EnforceStrictCoreClamps=true
+; Minimum physical P-core count required before applying hard allocation splits
+MinCoresForIsolationSplit=6
+; Proportional 2:3:1 physical-core scaler (Audio+GPU : Guest JIT : Aux Quarantine)
+; Automatically excludes SMT siblings and E-cores via ax::topology (Activity 5.6)
+CoreRatio=2:3:1
+EnableProportionalScaler=true
+[HardwareFeatureFlags]
+; Runtime hardware capability detection (auto | force_on | force_off) (Activity 5.7)
+; Encapsulates Maxwell/QSV paths cleanly from core dispatch to minimise upstream rebase friction
+MaxwellSafeUBOPassthrough=auto
+VramShieldPruneTriggerMB=5000
+VramShieldCeilingMB=5500
+VramShieldLsfgCeilingMB=5350
+IntelQSVVideoOffload=auto
+[WindowsPlatformHacks]
+; Escalates the HostTiming event ring directly into the multimedia scheduler layer
+EnableMMCSSProAudioScaling=true
+; Thread scheduling class priorities (REALTIME, HIGH, ABOVENORMAL, NORMAL, BELOWNORMAL)
+; Kept at HIGH so MMCSS Pro Audio manages preemption safely without starving USB xHCI IRQs
+HostTimingPriorityClass=HIGH
+VulkanDriverPriorityClass=HIGH
+GuestExecutionPriorityClass=ABOVENORMAL
+AuxQuarantinePriorityClass=BELOWNORMAL
+```
 ---
 
 ## 2. Shader Preprocessor & Build Validation Pipeline
@@ -78,27 +113,22 @@ During `v1.34` Stage 0 bring-up (objects `[498/1820]–[500/1820]` in `build_sta
 
 ---
 
-## 3. Async Telemetry Daemon (`telemetry_daemon.ps1`)
-
-The async telemetry daemon provides low-overhead, per-core live profiling of `eden.exe` during PGO training sweeps and regression runs.
-
-* **Execution Model:** Runs asynchronously out-of-process with configurable polling intervals and graceful shutdown signal handling to prevent frame-pacing interference.
-* **Captured Metrics (JSON Output):**
-  * **Per-Core CPU Utilisation & Affinities:** Verifies thread pinning against `eden_engine.ini` `EngineTopology` masks (Core 0 Audio/Timing, Core 1 Vulkan, Cores 2–4 Guest JIT, Core 5 Quarantine).
-  * **Memory Footprint:** Tracks working set, private bytes, and large-page allocation health.
-  * **Audio Buffer Health:** Captures initial audio ring buffer fill watermarks (queued for expansion with ASIO underrun and voice drop counters in `v1.35`).
-* **Regression Integration:** Output JSON logs are parsed automatically between build stages to verify zero affinity drift or memory regressions.
-
+## 3. Async Telemetry Daemon (Scripts\track_telemetry.ps1)
+The async telemetry daemon provides low-overhead, per-core live profiling of eden.exe during PGO training sweeps and regression runs.
+* Execution Model: Runs asynchronously out-of-process using a non-locking IO.FileStream tail reader on eden_current.log alongside kernel/GPU counters to prevent frame-pacing interference.
+* Captured Metrics (build_stage_telemetry_metrics.json):
+* Per-Core CPU Utilisation & Affinities: Verifies thread pinning against eden_engine.ini EngineTopology masks (Core 0 Audio/Timing, Core 1 Vulkan, Cores 2–4 Guest JIT, Core 5 Quarantine).
+* Memory Footprint: Tracks working set, private bytes, and large-page allocation health.
+* Audio & Async VRAM Health: Captures batch SPSC audio buffer switches (asio_buffer_switches), audio_underruns, and VkVramShield 5.00 GiB async transfer reaper activity.
+* Regression Integration (Scripts\check_regression.ps1): Output JSON logs are graded automatically against baseline_telemetry.json to block affinity drift or memory regressions.
 ---
-
 ## 4. Build Orchestration & Scripting Standards (Windows)
-
-### 4.1 Integrated PGO Batch Pipeline (`PGO_stage0LD.bat`, `PGO_stage1.bat`, `PGO_stage2.bat`)
-All PGO stage scripts enforce a standardized four-step quality gate sequence:
-1. **Clean:** Purge stale build artefacts and intermediate objects.
-2. **Harmonize & Validate:** Invoke `macro_update.ps1` followed by `shader_validate.ps1`.
-3. **Compile / Bake:** Execute `clang-cl 23+` (`ThinLTO` / PGO instrumentation or profile-use bake).
-4. **Telemetry Regression Check:** Validate runtime metrics via `telemetry_daemon.ps1` output.
+### 4.1 Integrated PGO Batch Pipeline (PGO_config.bat → PGO_stage0.bat, PGO_stage0LD.bat, PGO_stage1.bat, PGO_stage2.bat)
+All PGO stage scripts enforce a standardized quality gate sequence:
+1. Clean & Hardware Audit: Purge stale build artefacts (clean_all.ps1 on 0LD/1) and validate host topology (check_hardware.ps1).
+2. Harmonize & Validate: Invoke macro_update.ps1 followed by shader_validate.ps1 (plus validate_profile.ps1 and default.profdata verification before Stage 2).
+3. Compile / Bake: Execute clang-cl 23+ (-march=skylake -mavx2 -mfma -mbmi -mbmi2, lld-link, and PGO instrumentation or -fprofile-use bake).
+4. Stage Configs & Regression Gate: Copy eden_engine.ini and FlexASIO.toml into %BUILD_DIR%\bin\ and validate runtime metrics via check_regression.ps1.
 
 ### 4.2 Interactive Root Configurator Menu
 * Dynamically queries and renders live IRQ affinity audit results from `check_hardware.ps1` and `set_irq_affinity.ps1` directly inside the CLI menu.

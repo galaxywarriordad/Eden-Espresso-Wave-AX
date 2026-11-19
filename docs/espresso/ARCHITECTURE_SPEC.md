@@ -1,11 +1,11 @@
-# 🗺️ Eden Emulator: Comprehensive Architectural Specification (Master v1.34)
+# 🗺️ Eden Emulator: Comprehensive Architectural Specification (Master v1.35)
 
 Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, & Global Microarchitectural Dependency Matrix  
-**Updated:** `2026-11-16` (Post-Shader Macro Harmonization & Pipeline Telemetry Sprint)
+**Updated:** `2026-11-19` (Post-`ax-sdk v1.35.0` & Vulkan 1.4 Async `VK_QUEUE_TRANSFER_BIT` VRAM Shield Integration)
 
-**Hardware Baseline:** Intel Core i5-9600K (6 Physical Cores / 6 Hardware Threads / Zero SMT — `x48` / `4.8 GHz` locked symmetrically across all cores, 9 MB L3 Smart Cache) + NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200) + Intel UHD Graphics 630 iGPU (Vendor `0x8086`) + HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
+**Hardware Baseline:** Intel Core i5-9600K (6 Physical Cores / 6 Hardware Threads / Zero SMT — `x48` / `4.8 GHz` locked symmetrically across all cores, 9 MB L3 Smart Cache) + NVIDIA GeForce GTX 980 Ti (6 GB GDDR5, Maxwell GM200, Vulkan 1.4) + Intel UHD Graphics 630 iGPU (Vendor `0x8086`) + HiBy FC3 USB DAC (ESS Sabre ES9281AC Pro)
 
-**Target Platforms:** Windows 10/11 Desktop Host (`PGO_stage0LD.bat` → `PGO_stage1.bat` → `PGO_stage2.bat`) & Eden Piccolo [AX] (`< 300 MB` `toram` EROFS `PREEMPT_RT` Batocera USB Appliance)
+**Target Platforms:** Windows 10/11 Desktop Host (`PGO_stage0.bat` / `PGO_stage0LD.bat` → `PGO_stage1.bat` → `PGO_stage2.bat`) & Eden Piccolo [AX] (`< 300 MB` `toram` EROFS `PREEMPT_RT` Batocera USB Appliance)
 
 **Storage Topology:**
 * **NVMe #1:** OS + `eden.exe` + Vulkan Shader Cache
@@ -100,9 +100,9 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 * **The Character Encoding Firewall & Workspace Purge (`PGO_stage0LD.bat` & `clean_all.bat`):** Forces the host context interpreter straight into `chcp 65001` (UTF-8 Code Page Mode), preserving Unicode structure tags of the medium-shade coffee liquid asset (`▒`) without character dropping or line buffer splitting. Terminates active build engine processes, clears telemetry metrics logs, purges internal binary tracking manifests, and launches an asynchronous multi-threaded PowerShell disk deletion worker prior to running `clang-cl 23.1.4` via Ninja.
 * **Integrated PGO Stage Quality Gates (`PGO_stage0LD.bat`, `PGO_stage1.bat`, `PGO_stage2.bat`):** All PGO stage batch scripts invoke `Scripts\macro_update.ps1`, `Scripts\shader_validate.ps1`, and `Scripts\telemetry_daemon.ps1` regression checks between cleaning and compilation/baking steps. PowerShell invocations use scoped inline `-ExecutionPolicy Bypass` flags, and batch conditional blocks avoid nested multi-line `else` syntax hazards via explicit error-level checks and `setlocal EnableDelayedExpansion`.
 * **Interactive Root Configurator Menu:** Queries and renders live IRQ affinity audit results sourced from `Scripts\check_hardware.ps1` directly inside the CLI menu to verify system readiness before launching builds or sweeps.
-* **The Modernised Externals Ingestion Gateway & Pure Win32 Linker Isolation (`CMakeLists.txt`, `externals/CMakeLists.txt`, `src/common/CMakeLists.txt`):** Declares dependency mappings via `FetchContent_Declare` and runs population checks inside `FetchContent_MakeAvailable(asio_sdk)` to comply with CMake 4.5+ Policy `CMP0169`, mapping the flat root structure of the Steinberg ASIO SDK.
-* **v1.34 Linker & Runtime Alignment:** Updates platform libraries and CRT flags to purge unused stubs, isolates hardware workarounds behind runtime capability feature flags (`eden_engine.ini`), and enforces strict header ordering, guard macros, and scope enum registrations.
-* **Config-Driven 2:3:1 Physical-Core Partitioning & Process-Validated Affinity (`eden_engine.ini`):** Defaults to exact `0x01`/`0x02`/`0x1C`/`0x20` masks on the Intel Core i5-9600K while supporting a lightweight startup scaler (`EnableProportionalScaler=true`) that reads `2:3:1` ratios from `[EngineTopology]` and scales proportionally across physical P-cores on 8/12/16-core CPUs without work-stealing jitter.
+* **Cross-Host `ax-sdk` Ingestion Gateway & `WIN32`-Gated Audio Provisioning (`externals/CMakeLists.txt`, `src/common/CMakeLists.txt`):** Fetches the shared MIT-licensed C++20 silicon core (`ax-sdk` → `ax::core`, linked publicly to `common` and `video_core`) via CMake `FetchContent`, while gating Windows-only `asio_sdk` (`audiosdk/asio.git`) and `FlexASIO` provisioning strictly under `if (WIN32)` so Linux/Piccolo builds compile cleanly without Win32 COM dependencies.
+* **v1.35 Linker & Runtime Alignment:** Validates PGO `.profdata` counters via `Scripts\validate_profile.ps1` ahead of Stage 2 compilation, enforces `HostTimingPriorityClass=HIGH` alongside MMCSS `Pro Audio` in `eden_engine.ini` to prevent Core 0 USB xHCI IRQ starvation, and stages `eden_engine.ini` + `FlexASIO.toml` automatically into `%BUILD_DIR%\bin\`.
+* **Dynamic `2:3:1` Physical-Core Partitioning (`ax::topology` & `eden_engine.ini`):** Enumerates physical P-cores via `GetLogicalProcessorInformationEx` (`RelationProcessorCore` + `EfficiencyClass`) on Windows and `/sys/devices/system/cpu` (`thread_siblings_list` + `cpu_capacity`) on Linux—filtering out SMT hyperthreads and E-cores, producing exact `0x01`/`0x02`/`0x1C`/`0x20` masks on the i5-9600K, and scaling `CoreRatio=2:3:1` proportionally across 8/12/16-core CPUs with RAII `AvRevertMmThreadCharacteristics` cleanup.
 * **1:1 PCIe/USB/SATA Hardware IRQ Steering:** Configures static IRQ steering (`Scripts\set_irq_affinity.ps1`) with a process-scoped reversible runtime MSI IRQ helper (`Scripts\irq_runtime_helper.ps1`).
 
 ---
@@ -147,7 +147,7 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 
 * **Inline Cache-Local Instantiation (`AudioCore::AudioCore`):** Instantiates `AudioManager` and the ADSP microkernel inline via `std::optional` to maintain strict L1/L2 cache locality on Host Core 0, operating at a stable 4.8 GHz BIOS `x48` baseline. This guarantees absolute timing uniformity across zero-heap graph compilation sequences.
 * **MMCSS Pro Audio / `SCHED_FIFO 99` Preemption Guard & Voice-Drop Telemetry (`AudioCore::Renderer::SystemManager`):** Pins `AudioRenderSystemManager` onto Core 0 (`TimingAndAudio = 0x01`) at `ThreadPriority::Critical` wrapped in `ScopedProAudio` (`AvSetMmThreadCharacteristicsW` / `SCHED_FIFO` priority 99), monitoring renderer voice-drop pressure alongside sink-level `g_metrics.audio_underruns`.
-* **Cross-Core Lock-Free PCM Ring Buffer (`lockfree_audio_queue.hpp`):** Streams raw PCM samples generated by the JIT recompiler on Cores 2–5 over to Core 0 via a cache-line-aligned (`alignas(64)`) atomic ring buffer (`RING_CAPACITY = 2048`) with Acquire-Release semantics inside a tight 128-sample (2.67 ms Windows) / 96-frame (2.00 ms Piccolo ALSA) window.
+* **Cache-Line-Isolated Batch SPSC PCM Ring Buffer (`ax::audio` & `lockfree_audio_queue.hpp`):** Delegates stereo frame transport to `ax-sdk`'s 64-byte cache-line-padded `ax::audio::LockFreeStereoRing<2048, float>` (`PushBatch`, `PopBatch`, and `PopPlanarBatch` for separate Left/Right Steinberg ASIO buffers), using contiguous `std::memcpy` wrap-around slices and per-callback telemetry updates inside a 128-sample (`2.67 ms` Windows) / 96-frame (`2.00 ms` Piccolo ALSA) window.
 * **Primary Direct Hardware Path + Secondary Cubeb Fallback:**
   * **Windows Primary Path:** Provisions valid TOML profiles across root, `src\`, and user profile paths (`wasapiExclusiveMode = true`, `bufferSizeSamples = 128`), routing bit-perfect PCM over USB xHCI (IRQ `0x01`) directly to the ESS Sabre ES9281AC Pro clock inside your HiBy FC3 USB DAC.
   * **Piccolo Linux Primary Path:** Opens direct exclusive `hw:CARD=FC3,DEV=0` (`S32_LE`, 48 kHz, 96 frames $\times$ 2 periods / 2.00 ms) with PipeWire and PulseAudio excised from the rootfs.
@@ -167,9 +167,10 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 * **Native Vulkan Telemetry OSD & SPIR-V Pipeline:** Integrates real-time RAM working set and commit memory monitoring via Win32 `psapi` directly into the engine render loop. Renders text overlays using compiled binary SPIR-V font shaders (`font.vert.spv`, `font.frag.spv`) through custom Graphics Pipeline State Objects (PSOs) with alpha blending and dynamic vertex quad generation.
 * **Vulkan Query Pools & Pipeline Statistics:** Leverages native `VK_QUERY_TYPE_PIPELINE_STATISTICS` query pools to track vertex, primitive, and shader invocation metrics asynchronously without stalling the GPU command stream.
 * **Dedicated Vulkan Command Submission Ring & Zero-Allocation Descriptors:** Locks `VulkanWorker` onto Core 1 (`VulkanSubmit = 0x02`) at `ThreadPriority::VeryHigh` alongside the 1:1 GTX 980 Ti MSI interrupt (`0x02`) on its dedicated 4.8 GHz pipeline, routing uniform updates through `DescriptorUpdateManager` (`vkCreateDescriptorUpdateTemplate`).
-* **Maxwell GM200 / Pascal Protection:**
-  * Speculative 5.50 GB DXGI VRAM Shield (`vk_rasterizer.cpp`).
-  * Enforces `maxPushDescriptors` hardware ceilings with safe null-descriptor fallbacks on slot overflow.
+### 🎨 Phase 3: VRAM Boundaries, Config-Driven Scaling & High-Fidelity BC7/BC6H Compression (`v1.35`)
+* **Focus:** Enforce deterministic memory ceilings within the GTX 980 Ti's 6 GB VRAM budget, enable config-driven `2:3:1` core scaling with runtime hardware capability flags, introduce Eden Piccolo Linux shims, and upgrade texture formats to near-lossless BC7 and BC6H.
+* **File Footprint:** `vk_rasterizer.cpp`, `vk_vram_shield.hpp`, `texture_cache.*`, `astc_to_bc7.comp`, `ax_platform_shim.hpp`, `eden_engine.ini`, `topology.ini`, `vk_device.cpp`, `vulkan_device.h`
+* **Key Activities:** Speculative VRAM over-subscription shield, fragment-aware VRAM texture reaper, high-fidelity BC7/BC6H compression, CPU-delta overlap resolution, and config-driven symmetrical core scaler logic.
   * Clamps `VkImageSubresourceRange` mip/layer counts prior to `vkCreateImageView` and validates sub-buffer alignment limits within `vk_ubo_passthrough.cpp` to eliminate `VK_ERROR_DEVICE_LOST` faults.
   * Calibrated 3D compute unswizzle tiers (`gpu_unswizzle_max_texture_size`: 64/128/256 MiB, `stream_size`: 8/16/32 MiB, `chunk_size`: 64/128/256 slices).
 * **Storage & Auxiliary Quarantine Hierarchy on Core 5 (`0x20`):**
@@ -211,10 +212,10 @@ Root Subsystem Target Topology, Multi-Threaded Data-Flow, Operational Context, &
 * **File Footprint:** `src/video_core/macro/macro.h/.cpp`, `macro_jit_compiler.h/.cpp`, `src/video_core/engines/maxwell_3d.cpp`, `src/video_core/renderer_vulkan/vk_rasterizer.cpp`, `vk_ubo_passthrough.h/.cpp`, `vk_update_descriptor.h/.cpp`, `vk_texture_cache.cpp`, `emit_spirv.cpp`, `dma_ring_bridge.h/.cpp`, `src/audio_core/sink/flex_asio_manager.cpp`
 * **Key Activities:** Spatially partitioned macro-JIT core, page-contiguity-guarded push descriptor streams, zero-vertex-stream procedural draw fastpath, and Maxwell image view range clamping.
 
-### 🎨 Phase 3: VRAM Boundaries, Config-Driven Scaling & High-Fidelity BC7/BC6H Compression (`v1.35`)
-* **Focus:** Enforce deterministic memory ceilings within the GTX 980 Ti's 6 GB VRAM budget, enable config-driven `2:3:1` core scaling with runtime hardware capability flags, introduce Eden Piccolo Linux shims, and upgrade texture formats to near-lossless BC7 and BC6H.
-* **File Footprint:** `vk_rasterizer.cpp`, `vk_vram_shield.hpp`, `texture_cache.*`, `astc_to_bc7.comp`, `ax_platform_shim.hpp`, `eden_engine.ini`, `topology.ini`, `vk_device.cpp`, `vulkan_device.h`
-* **Key Activities:** Speculative VRAM over-subscription shield, fragment-aware VRAM texture reaper, high-fidelity BC7/BC6H compression, CPU-delta overlap resolution, and config-driven symmetrical core scaler logic.
+### 🎨 Phase 3: Async `5.00 GiB` VRAM Shield, Dynamic `2:3:1` Topology & High-Fidelity BC7/BC6H Compression (`v1.35`)
+* **Focus:** Eliminate VBLANK VRAM eviction stalls within the GTX 980 Ti's 6 GB budget via proactive `5.00 GiB` `VK_QUEUE_TRANSFER_BIT` + Vulkan 1.4 split-barrier pruning, deploy dynamic P-core/SMT `2:3:1` scaling + batch SPSC audio rings via `ax-sdk`, and upgrade texture compression to BC7/BC6H.
+* **File Footprint:** `ax-sdk/include/ax/{vram,topology,audio}.hpp`, `ax-sdk/src/topology.cpp`, `vk_rasterizer.h/.cpp`, `vk_vram_shield.hpp`, `vulkan_device.h/.cpp`, `vulkan_wrapper.h/.cpp`, `lockfree_audio_queue.hpp`, `eden_engine.ini`, `texture_cache.*`, `astc_to_bc7.comp`
+* **Key Activities:** **`[COMPLETED]`** Proactive `5.00 GiB` async VRAM shield (`VkVramShield` + `VK_QUEUE_TRANSFER_BIT` + `vkCmdSetEvent2`/`WaitEvents2`), dynamic `GetLogicalProcessorInformationEx` / `sysfs` `2:3:1` physical-core scaler, and cache-line-padded batch SPSC audio queue; **`[REMAINING]`** high-fidelity BC7/BC6H compute transcode shader (`astc_to_bc7.comp`) and CPU-delta overlap invalidation (`PR #32`).
 
 ### 🎨 Phase 4: Async Concurrency, Cross-Silicon Offloading & Reversible IRQ Steering (`v1.36`)
 * **Focus:** Leverage parallel hardware pipelines (GTX 980 Ti Async Compute, Intel UHD 630 iGPU, WinRT WGC / `lsfg-vk 2.0.0+`, and Vulkan Video Decode) without PCIe bottlenecks, and replace manual Windows registry modifications with a reversible runtime MSI IRQ helper.

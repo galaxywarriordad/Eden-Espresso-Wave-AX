@@ -239,8 +239,16 @@ if (ENABLE_CUBEB)
 endif()
 
 target_sources(audio_core PRIVATE
+    lockfree_audio_queue.hpp
     sink/sdl3_sink.cpp
     sink/sdl3_sink.h)
+
+if (WIN32)
+    target_sources(audio_core PRIVATE
+        flex_asio_manager.cpp
+        flex_asio_manager.hpp)
+    target_link_libraries(audio_core PRIVATE asio::asio)
+endif()
 
 target_link_libraries(audio_core PRIVATE SDL3::SDL3)
 target_compile_definitions(audio_core PRIVATE HAVE_SDL3)

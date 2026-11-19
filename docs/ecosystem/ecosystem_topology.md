@@ -2,7 +2,7 @@
 
 **Programme:** The Silicon Preservation Society (`[AX]`)  
 **Mission:** Keep proven PC hardware out of landfills through deterministic bare-metal optimization.  
-**Last Updated:** `2026-11-18`
+**Last Updated:** `2026-11-19`
 
 The full multi-repository and silicon topology is structured across four primary layers—ranging from the upper emulator cartridges and shared C++20 runtime core to the bare-metal Linux console OS appliance and the target reference silicon (Intel Core i5-9600K combined with an NVIDIA GTX 980 Ti, Intel UHD 630 iGPU, and HiBy FC3 USB DAC).
 
@@ -32,11 +32,11 @@ The full multi-repository and silicon topology is structured across four primary
 
 * **License & Portability:** Published under the **MIT License** with zero external dependencies so it links cleanly into `GPL-3.0`, `MPL-2.0`, and `GPLv2` emulators.
 * **Committed Modules (`include/ax/` & `src/`):**
-  * `topology.hpp` + `topology.cpp`: Enforces `2:3:1` spatial core masks (`0x01`, `0x02`, `0x1C`, `0x20`), detects SMT buddies, applies `pthread_setaffinity_np` + `SCHED_FIFO` on Linux (isolating `<windows.h>` + MMCSS Pro Audio inside `topology.cpp`), and probes `/dev/cpu/0/msr` (`0xc8f`) for Intel Cache Allocation Technology (CAT).
+  * `topology.hpp` + `topology.cpp`: Enumerates physical P-cores via `GetLogicalProcessorInformationEx` (`LTP_PC_SMT` + `EfficiencyClass`) on Windows and `/sys/devices/system/cpu` (`thread_siblings_list` + `cpu_capacity`) on Linux, dynamically scaling `CoreRatio=2:3:1` (`0x01`, `0x02`, `0x1C`, `0x20` on `i5-9600K`) with RAII `AvRevertMmThreadCharacteristics` cleanup on Windows, `pthread_setaffinity_np` + `SCHED_FIFO` on Linux, and `/dev/cpu/0/msr` (`0xc8f`) Intel CAT detection.
   * `memory.hpp` + `memory.cpp`: Defines `1G` / `2M` HugeTLB fastmem arenas, single-cycle BMI1 (`_bextr_u64`) guest page extraction, and `_MM_HINT_NTA` non-temporal streaming hints when CAT `0xc8f` is unavailable.
-  * `vram.hpp`: Enforces VBLANK VRAM ceilings (`5.50 GiB` standard, `5.35 GiB` with `lsfg-vk 2.0.0+` bindless active) and exposes Maxwell GM200 capability flags (`FP16 → FP32` promotion, `VK_QUEUE_TRANSFER_BIT`, `256 MB BAR1` WC pool, `SHFL` subgroup reductions).
+  * `vram.hpp`: Implements proactive **`5.00 GiB` (`kPruneTriggerBytes`) async VRAM pruning** (`~4.50 GiB` hysteresis recovery) ahead of the `5.50 GiB` standard (`5.35 GiB` `lsfg-vk 2.0.0+` / `5.20 GiB` Win32 LS) hard ceilings, paired with `VkVramShield` (`VK_QUEUE_TRANSFER_BIT` + Vulkan 1.4 `vkCmdSetEvent2`/`WaitEvents2` split barriers + Core 5 reaper).
   * `igpu.hpp`: Defines zero-copy `DRM_FORMAT_MOD_LINEAR` `NV12` `dma_buf` descriptors for UHD 630 → GTX 980 Ti handoffs and enforces the `<= 3.50 GB/s` DDR4 ring-bus bandwidth guardrail.
-  * `audio.hpp`: Provides a cache-line-aligned (`alignas(64)`) lock-free SPSC stereo `S32_LE` ring buffer sized for a 96-frame (`2.00 ms` @ `48 kHz`) exclusive USB DAC loop.
+  * `audio.hpp`: Provides a 64-byte cache-line-isolated templated `LockFreeStereoRing<2048, SampleT>` (`Push`, `Pop`, `PopPlanar`) using contiguous `std::memcpy` wrap-around slices for both `96`-frame (`2.00 ms`) Piccolo ALSA and `128`-sample (`2.67 ms`) Win32 ASIO loops.
 
 ### Layer 3: Bare-Metal Linux Console OS Platform (`Piccolo-AX` / `BR2_EXTERNAL`)
 
@@ -137,5 +137,7 @@ Cemu-Latte-AX/
 ```text
 Eden-Espresso-Wave-AX/
 ├── README.md                                       # Linked in 4-repo network table
-└── src/ & Scripts/                                 # Active v1.34 codebase with Sprint 0 automation (consumes ax-sdk in v1.35.0)
+├── externals/CMakeLists.txt                        # FetchContent ax_sdk (ax::core) + WIN32-gated asio_sdk & FlexASIO
+├── eden_engine.ini                                 # CoreRatio=2:3:1 & HostTimingPriorityClass=HIGH guardrails
+└── src/ & Scripts/                                 # Active v1.35.0 codebase (VkVramShield, VK_QUEUE_TRANSFER_BIT, Vulkan 1.4 split barriers, batch audio ring)
 ```

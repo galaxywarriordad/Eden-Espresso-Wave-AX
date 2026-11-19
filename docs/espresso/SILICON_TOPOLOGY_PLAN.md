@@ -67,166 +67,42 @@ The following table maps the precise physical core counts, SMT states, and dynam
 
 ---
 
-## 3. Core Subsystem Implementation
-
-To implement this layout dynamically, we deploy a comprehensive platform shim layer. At boot time, it queries native Win32 tracking indexes to locate L3 cache domains and processor masks, filtering out secondary SMT buddy paths automatically.
-
-**File Footprint:** `src/common/topology.cpp`
-
+## 3. Core Subsystem Implementation (ax-sdk)
+To share a single deterministic silicon parser across Eden Espresso Wave [AX], Eden Piccolo [AX], and Cemu Latte [AX], the topology resolver lives inside ax-sdk (ax::topology in include/ax/topology.hpp and src/topology.cpp). At boot time (std::call_once), it queries native Win32 GetLogicalProcessorInformationEx (RelationProcessorCore + LTP_PC_SMT + EfficiencyClass) or Linux /sys/devices/system/cpu (thread_siblings_list + cpu_capacity), sorts physical P-cores ahead of E-cores, filters out secondary SMT siblings, and applies the proportional CoreRatio=2:3:1 split:
+File Footprint: ax-sdk/include/ax/topology.hpp & ax-sdk/src/topology.cpp
 ```cpp
-// src/common/topology.cpp — Unified Intel & AMD Dynamic SMT/CCX Topology Resolver
-#include "common/topology.h"
-#include "common/logging/log.h"
-#include <windows.h>
-#include <vector>
-#include <thread>
-#include <map>
-#include <algorithm>
-
-namespace Common::Topology {
-
-TopologyProfile AutoDetectHostSilicon() {
-    TopologyProfile profile{
-        .physical_cores = 0,
-        .logical_threads = std::thread::hardware_concurrency(),
-        .has_smt = false,
-        .audio_mask = 0x1,
-        .vulkan_mask = 0x2,
-        .jit_mask = 0,
-        .aux_mask = 0
-    };
-
-    DWORD buffer_size = 0;
-
-    // 1. Query L3 Cache topology boundaries to map out AMD CCX structures
-    GetLogicalProcessorInformationEx(RelationCache, nullptr, &buffer_size);
-    std::vector<BYTE> cache_buffer(buffer_size);
-
-    if (GetLogicalProcessorInformationEx(RelationCache,
-            reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(cache_buffer.data()), &buffer_size)) {
-        size_t offset = 0;
-        uint32_t ccx_index = 0;
-
-        while (offset < buffer_size) {
-            auto* info = reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(&cache_buffer[offset]);
-            if (info->Relationship == RelationCache && info->Cache.Level == 3) {
-                KAFFINITY mask = info->Cache.GroupMask.Mask;
-                for (uint8_t i = 0; i < 64; ++i) {
-                    if ((mask >> i) & 1) {
-                        profile.ccx_domains[i] = ccx_index;
-                    }
-                }
-                ccx_index++;
-            }
-            offset += info->Size;
-        }
-    }
-
-    // 2. Query core boundaries to filter out secondary SMT companion buddy threads
-    buffer_size = 0;
-    GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &buffer_size);
-    std::vector<BYTE> core_buffer(buffer_size);
-
-    if (!GetLogicalProcessorInformationEx(RelationProcessorCore,
-            reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(core_buffer.data()), &buffer_size)) {
-        LOG_ERROR(System, "Topology: Critical Win32 API failure querying core processor boundaries.");
-        return profile; // Fall back to safe baseline values
-    }
-
-    size_t offset = 0;
-    std::vector<uint8_t> primary_physical_pins;
-    std::vector<uint8_t> secondary_smt_pins;
-
-    while (offset < buffer_size) {
-        auto* info = reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(&core_buffer[offset]);
-        if (info->Relationship == RelationProcessorCore) {
-            profile.physical_cores++;
-            if (info->Core.Flags == LTP_EMPTY_CORE_RELATIONSHIP) {
-                profile.has_smt = true;
-            }
-
-            KAFFINITY mask = info->Core.GroupMask.Mask;
-            bool found_primary = false;
-            for (uint8_t i = 0; i < 64; ++i) {
-                if ((mask >> i) & 1) {
-                    if (!found_primary) {
-                        primary_physical_pins.push_back(i);
-                        found_primary = true;
-                    } else {
-                        secondary_smt_pins.push_back(i);
-                    }
-                }
-            }
-        }
-        offset += info->Size;
-    }
-
-    // 3. Separate execution pins into isolated cache groups (CCX 0 vs Rest)
-    std::vector<uint8_t> ccx0_clean_pins;
-    std::vector<uint8_t> auxiliary_spill_pins;
-
-    for (uint8_t pin : primary_physical_pins) {
-        auto it = profile.ccx_domains.find(pin);
-        if (it != profile.ccx_domains.end() && it->second == 0) {
-            ccx0_clean_pins.push_back(pin);
-        } else {
-            auxiliary_spill_pins.push_back(pin);
-        }
-    }
-
-    // Handle Intel ring bus topology gracefully if single L3 domain is encountered
-    if (ccx0_clean_pins.empty() || auxiliary_spill_pins.empty()) {
-        ccx0_clean_pins = primary_physical_pins;
-        auxiliary_spill_pins.clear();
-    }
-
-    // 4. Construct the custom, dynamically isolated affinity masks
-    uintptr_t audio_affinity = 0;
-    uintptr_t vulkan_affinity = 0;
-    uintptr_t jit_affinity = 0;
-    uintptr_t aux_affinity = 0;
-
-    // Pin Audio onto Physical Core 0 and Vulkan Command Submission onto Physical Core 1 inside CCX 0
-    audio_affinity |= (1ULL << ccx0_clean_pins[0]);
-    vulkan_affinity |= (1ULL << ccx0_clean_pins[1]);
-
-    // Map high-priority Guest JIT recompiler threads to remaining CCX 0 execution lanes
-    size_t assigned_jit_count = 0;
-    size_t pin_index = 2;
-    for (; pin_index < ccx0_clean_pins.size() && assigned_jit_count < 4; ++pin_index) {
-        jit_affinity |= (1ULL << ccx0_clean_pins[pin_index]);
-        assigned_jit_count++;
-    }
-
-    // Push remaining files, background decompression, and GUI tracks to secondary CCX/spill zones
-    for (; pin_index < ccx0_clean_pins.size(); ++pin_index) {
-        aux_affinity |= (1ULL << ccx0_clean_pins[pin_index]);
-    }
-    for (uint8_t pin : auxiliary_spill_pins) {
-        aux_affinity |= (1ULL << pin);
-    }
-
-    // Safe fallback check: Ensure background tracks have an execution path on lower-core parts
-    if (aux_affinity == 0 && !secondary_smt_pins.empty()) {
-        aux_affinity |= (1ULL << secondary_smt_pins.back());
-    }
-
-    profile.audio_mask = audio_affinity;
-    profile.vulkan_mask = vulkan_affinity;
-    profile.jit_mask = jit_affinity;
-    profile.aux_mask = aux_affinity;
-
-    LOG_INFO(System, "[TOPOLOGY UNIFIED] Detected Cores: {}C/{}T | SMT: {} | Calculated Masks: "
-                     "Audio: 0x{:X} | Vulkan: 0x{:X} | JIT Lane Count: {} (Mask: 0x{:X}) | Aux: 0x{:X}",
-             profile.physical_cores, profile.logical_threads, profile.has_smt ? "ACTIVE" : "OFF",
-             profile.audio_mask, profile.vulkan_mask, assigned_jit_count, profile.jit_mask, profile.aux_mask);
-
-    return profile;
+// ax-sdk/src/topology.cpp — Cross-Platform Physical P-Core / SMT 2:3:1 Resolver
+void BuildProportionalMasks(const std::vector& cores,
+SiliconProfile& profile) noexcept {
+if (cores.empty()) {
+return; // Retain safe 6-core defaults (0x01, 0x02, 0x1C, 0x20)
 }
-
-} // namespace Common::Topology
+const std::size_t n = cores.size();
+auto bit_for = [&](std::size_t idx) noexcept -> std::uint64_t {
+const std::uint32_t cpu = cores[idx].primary_logical_cpu;
+return (cpu < 64U) ? (1ULL << cpu) : 0ULL;
+};
+// 2:3:1 proportional allocation across primary physical P-cores:
+//   1 dedicated core  -> AudioTiming (Core 0)
+//   1 dedicated core  -> VulkanSubmission (Core 1)
+//   ~50% of cores     -> GuestJit (min 2 cores, 3 on 6-core i5-9600K)
+//   remaining cores   -> Housekeeping / Async VRAM Reaper / SPIR-V / HID
+const std::size_t jit_count = std::clampstd::size_t(n / 2, 2, n - 3);
+const std::size_t jit_end = 2 + jit_count;
+profile.audio_mask = bit_for(0);
+profile.vulkan_mask = bit_for(1);
+std::uint64_t jit = 0;
+for (std::size_t i = 2; i < jit_end && i < n; ++i) {
+jit |= bit_for(i);
+}
+profile.jit_mask = (jit != 0) ? jit : bit_for(1);
+std::uint64_t hk = 0;
+for (std::size_t i = jit_end; i < n; ++i) {
+hk |= bit_for(i);
+}
+profile.housekeeping_mask = (hk != 0) ? hk : bit_for(n - 1);
+}
 ```
-
 ---
 
 ## 4. Execution Recommendation & Deployment Strategy
@@ -238,13 +114,13 @@ To ensure clean system stability, the rollout of this topology resolver is split
 (Bare-Metal Hardware Gate)         (Intel SMT Enablement Path)         (AMD CCX Topology Realignment)
 ```
 
-### 🏁 Immediate Next Step: Intel SMT Deployment (Sprint 1 / `v1.35`)
-* **The Schedule:** Implement immediately upon launching the `v1.35` release branch cycle.
-* **The Rationale:** Intel's Ring Bus architecture represents a single unified L3 cache group. Deploying the primary Win32 core parser during Sprint 1 allows us to verify and stabilize physical core tracking, thread affinity masks, and SMT filtering matrices without dealing with complex multi-CCX cache layouts first.
+### ✅ Sprint 1 Completed: Cross-Platform Physical P-Core & Intel SMT Filtering (`ax-sdk v1.35.0`)
+* **Status:** **`[COMPLETED]`** Implemented in `ax-sdk/src/topology.cpp` (`EnumerateWin32PhysicalCores` using `LTP_PC_SMT` + `EfficiencyClass` and `EnumerateLinuxPhysicalCores` using `thread_siblings_list` + `cpu_capacity`, plus RAII `AvRevertMmThreadCharacteristics` cleanup on Windows).
+* **The Result:** Filters out secondary SMT sibling threads and Intel E-cores automatically across Windows and Linux (`Piccolo-AX`), preserving exact `0x01`/`0x02`/`0x1C`/`0x20` masks on the `i5-9600K` while scaling `CoreRatio=2:3:1` cleanly across 6C/12T and 8C–16C+ processors.
 
-### 🛑 Subsequent Target Step: AMD CCX Realignment (Sprint 2 / `v1.35`)
-* **The Schedule:** Implement as Phase 3 immediately following the verification of the Intel rollout.
-* **The Rationale:** Because AMD multi-CCD/CCX architectures require deeper hardware mapping (such as checking `RelationCache` indices), this logic should be activated only after the base Win32 topology shims are confirmed stable. This isolates debugging variables and ensures that any cache line sharing issues are caught early.
+### 🏁 Next Target Step: AMD Multi-CCX L3 Cache Grouping (Sprint 2 / `v1.35`)
+* **The Schedule:** Next enhancement in `ax-sdk/src/topology.cpp` once the `PGO_stage0LD` build and Stage A/B baseline gates are verified.
+* **The Rationale:** Adds Win32 `RelationCache` (L3) and Linux `/sys/devices/system/cpu/cpuN/cache/index3/shared_cpu_list` grouping into `EnumerateWin32PhysicalCores` / `EnumerateLinuxPhysicalCores` so `AudioTiming`, `VulkanSubmission`, and `GuestJit` stay packed inside CCX 0 on multi-CCX AMD Ryzen processors (`2600X/3600X/3700X/5900X`).
 
 ---
 

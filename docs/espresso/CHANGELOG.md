@@ -6,10 +6,25 @@ All notable changes, silicon-tuning milestones, and compiler fixes for **Eden Es
 
 ## [Unreleased] — Phases 2–6 Engineering Roadmap
 * **Phase 2 (Throughput & Math):** L1-aligned Xbyak GPU Macro-JIT, GTX 980 Ti stride guards, physical page-contiguity DMA checks (Citron PR #449 / #383), vertex-less draw fastpaths (Citron PR #448), and uniform ring packing.
-* **Phase 3 (VRAM & BC7/BC6H):** VRAM over-subscription shields, Fragment-Aware Texture Reaper, CPU-delta overlap invalidation (Eden PR #32), and hardware-native ASTC to BC7/BC6H texture recompression.
+* **Phase 3 (Remaining Fidelity & Overlap):** Fragment-Aware Texture Reaper, CPU-delta overlap invalidation (Eden PR #32), and hardware-native ASTC to BC7/BC6H texture recompression.
 * **Phase 4 (Async Silicon Offloading):** WinRT Windows Graphics Capture swapchain integration for `lsfg-vk`, secondary `VK_QUEUE_COMPUTE_BIT` queue, and Intel UHD 630 co-processing.
 * **Phase 5 (Closed-Loop Runtime & Dev-Kit Polish):** Predictive NVMe pre-faulting, frame-pacing governor, Maxwell register-pressure guards, Core 5 RawInput polling, and external USB-C telemetry screen support.
 * **Phase 6 (Autonomous Silicon R&D):** Live background ARM64 superblock re-compilation on Core 5, Intel VME motion vector synthesis, and hardware VBLANK/audio sync dongles.
+
+---
+
+## [v1.35] — 2026-11-19 (Proactive `5.00 GiB` Async Vulkan 1.4 VRAM Shield & `ax-sdk` Core Integration)
+### Added
+* **Proactive `5.00 GiB` Async VRAM Shield (`ax-sdk/include/ax/vram.hpp` & `src/video_core/renderer_vulkan/vk_vram_shield.hpp`):** Replaced synchronous VBLANK texture eviction with a non-blocking asynchronous pruning pipeline triggered at **`5.00 GiB`** (`kPruneTriggerBytes`, `~4.50 GiB` hysteresis recovery) ahead of the `5.50 GiB` (`5.35 GiB` LSFG) hard ceiling—offloading `vmaDestroyImage` / `vkDestroyImage` calls onto a `VK_KHR_timeline_semaphore`-fenced Core 5 (`ax::topology::Domain::Housekeeping`) background reaper with zero VBLANK frame-time stalls.
+* **Dedicated `VK_QUEUE_TRANSFER_BIT` Queue Discovery (`vulkan_device.h` & `vulkan_device.cpp`):** Extended `Vulkan::Device::SetupFamilies()` and `GetDeviceQueueCreateInfos()` to isolate dedicated hardware DMA transfer queue families (`VK_QUEUE_TRANSFER_BIT` without `VK_QUEUE_GRAPHICS_BIT`) on Maxwell GM200 and modern GPUs, exposing `GetTransferQueue()`, `GetTransferFamily()`, and `HasDedicatedTransferQueue()` with automatic `graphics_family` fallback.
+* **Vulkan 1.4 Synchronization2 Split Barriers (`vulkan_wrapper.h` & `vulkan_wrapper.cpp`):** Added core Vulkan 1.3/1.4 `vkCmdSetEvent2` and `vkCmdWaitEvents2` function pointers, dynamic loader hooks (with `KHR` extension fallbacks), and `vk::CommandBuffer` wrappers (`ALL_GRAPHICS_BIT` → `TRANSFER_BIT`).
+* **Dynamic P-Core / SMT `2:3:1` Topology Scaler (`ax-sdk/src/topology.cpp`):** Replaced static core heuristics with native Win32 `GetLogicalProcessorInformationEx` (`RelationProcessorCore` + `LTP_PC_SMT` + `EfficiencyClass`) and Linux `/sys/devices/system/cpu` (`thread_siblings_list` + `cpu_capacity`) physical P-core enumeration, plus RAII `AvRevertMmThreadCharacteristics` cleanup on Windows.
+* **Cache-Line-Padded Batch SPSC Audio Ring (`ax-sdk/include/ax/audio.hpp` & `src/audio_core/lockfree_audio_queue.hpp`):** Upgraded stereo audio transport to 64-byte cache-line-isolated `PushBatch`, `PopBatch`, and `PopPlanarBatch` (Steinberg ASIO Left/Right de-interleave) using contiguous `std::memcpy` wrap-around slices and per-callback telemetry accounting.
+
+### Changed
+* **Cross-Host CMake `FetchContent` & Target Hygiene (`externals/CMakeLists.txt`, `src/common/CMakeLists.txt`, `src/video_core/CMakeLists.txt`, `src/audio_core/CMakeLists.txt`):** Wired `ax-sdk` (`ax::core`) via CMake `FetchContent`, linked `ax::core` publicly onto `common`, registered `vk_vram_shield.hpp` and `flex_asio_manager.cpp/.hpp`, and gated Windows-only `asio_sdk` / `FlexASIO` dependencies under `if (WIN32)` for clean Linux (`Piccolo-AX`) builds.
+* **Core 0 IRQ Starvation Guard (`eden_engine.ini`):** Added explicit `CoreRatio=2:3:1` domain scaling and clamped `HostTimingPriorityClass=HIGH` alongside MMCSS `Pro Audio` so Core 0 scheduling never starves HiBy FC3 USB xHCI interrupts.
+* **PGO Batch Pipeline Guards (`Scripts\PGO_stage0.bat`, `PGO_stage0LD.bat`, `PGO_stage2.bat`):** Added `Scripts\validate_profile.ps1` and `default.profdata` pre-flight validation ahead of Stage 2 `-fprofile-use` compilation, enforced `-mavx2 -mfma -mbmi -mbmi2 -clang:-Wno-profile-instr-out-of-date`, and automated `eden_engine.ini` + `FlexASIO.toml` staging into `%BUILD_DIR%\bin\`.
 
 ---
 

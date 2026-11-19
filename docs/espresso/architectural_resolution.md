@@ -50,17 +50,17 @@ To elevate `[AX]` from a fragile hardware-specific fork into a robust, high-perf
  (Removes Static Bitmask Traps)        (Decouples VRAM from VBLANK)      (Hardens Bare-Metal CI/CD Gates)
 ```
 
-### Phase A: Dynamic SMT-Aware Topology Resolution (Target: Sprint 1 / `v1.35`)
+### Phase A: Dynamic SMT-Aware Topology Resolution (`[RESOLVED in ax-sdk v1.35.0]`)
 
-To eliminate the SMT pipeline stall hazard, hardcoded affinity bitmasks must be replaced by a dynamic hardware topology parsing subsystem inside `src/common/topology.cpp`:
+To eliminate the SMT pipeline stall hazard, hardcoded affinity bitmasks have been replaced by a cross-platform hardware topology resolver inside **`ax-sdk/src/topology.cpp`** (`ax::topology::DetectHostSilicon()`):
 
 1. **Logical Thread Extraction:** Query host CPU characteristics using `std::thread::hardware_concurrency()` and platform-specific OS registers (`GetLogicalProcessorInformationEx` on Windows; `sysfs` node structures on Linux) to identify physical core boundaries.
 2. **SMT Filtering Matrix:** If Hyper-Threading/SMT is detected at boot time, the engine must mask out secondary logical buddy threads. Workloads must be mapped strictly across primary physical execution units (e.g., routing JIT threads exclusively to even logical indices: `0, 2, 4, 6`).
 3. **Proportional Core Scaler Implementation:** Complete Backlog Activity 5.6. Read an abstract ratio configuration from `eden_engine.ini` (e.g., `CoreRatio=2:3:1`) and generate runtime affinity bitmasks dynamically on boot, allowing the system to scale fluidly from a 6-core processor up to a 16-core configuration.
 
-### Phase B: Asynchronous VRAM Compaction & Command Overlap (Target: Sprint 3 / `v1.35`)
+### Phase B: Asynchronous `5.00 GiB` VRAM Shield & Vulkan 1.4 Split Barriers (`[RESOLVED in Master v1.35]`)
 
-To remove memory compaction stalls from the critical display path, the eviction routines must be decoupled from the synchronous VBLANK execution block:
+To remove memory compaction stalls from the critical display path, eviction routines have been decoupled from the synchronous VBLANK execution block via **`ax-sdk/include/ax/vram.hpp`** (`kPruneTriggerBytes = 5.00 GiB`) and **`src/video_core/renderer_vulkan/vk_vram_shield.hpp`** (`VK_QUEUE_TRANSFER_BIT` + Vulkan 1.4 `vkCmdSetEvent2`/`vkCmdWaitEvents2` split barriers + Core 5 `VK_KHR_timeline_semaphore` reaper):
 
 1. **VRAM Budget Offloading:** Shift the 10% cache eviction loop (`EvictStaleCacheStructures`) completely out of the synchronous display tick pass.
 2. **Dedicated Transfer Queue Binding:** Connect the memory compaction subsystem directly to an independent background Vulkan transfer queue utilizing `VK_QUEUE_TRANSFER_BIT`.

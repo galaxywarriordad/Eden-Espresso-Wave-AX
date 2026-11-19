@@ -28,7 +28,7 @@ While standard emulators prioritize broad compatibility across generic OS schedu
 | :--- | :--- | :--- | :--- |
 | **Profiling & Telemetry** | Relies on external overlays (RTSS, MangoHud) or built-in ImGui metrics that introduce polling overhead and micro-stutters. | Uses proprietary, zero-overhead hardware performance counters and native developer telemetry tools (PIX). | **Native Vulkan OSD & Pipeline Stats:** Integrates a zero-stutter OSD (`telemetry_osd.cpp`) driven by hardware Vulkan query pools (`VK_QUERY_TYPE_PIPELINE_STATISTICS`) and Win32 `psapi` memory polling. |
 | **Compiler Optimization** | Uses standard CMake release configurations with standard compiler optimizations (`-O3`, `-flto`). | Uses aggressive, profile-guided layout optimizations tailored to specific console instruction caches. | **Multi-Stage PGO Pipeline:** Employs a rigorous 3-stage LLVM Profile-Guided Optimization workflow (`PGO_stage1.bat` → `llvm-profdata` → `PGO_stage2.bat`) to linearize hot code blocks into the CPU's L1i cache. |
-| **Hardware Resource Limits** | Reactive memory management that can trigger OS paging stalls during heavy asset spikes. | Proactive memory compaction and budget enforcement during vertical blanking intervals. | **VBLANK VRAM Reaper & Compaction:** Intercepts VBLANK windows to prune stale texture allocations in `64 KB` sectors and dynamically manage LOD quality tiers. |
+| **Hardware Resource Limits** | Reactive memory management that can trigger OS paging stalls during heavy asset spikes. | Proactive memory compaction and budget enforcement during vertical blanking intervals. | **Proactive `5.00 GiB` Async VRAM Shield:** Polls `VK_EXT_memory_budget` at VBLANK (`ax::vram`) and triggers non-blocking pruning at **`5.00 GiB`** (`~4.50 GiB` recovery) via dedicated `VK_QUEUE_TRANSFER_BIT` and Vulkan 1.4 `vkCmdSetEvent2`/`WaitEvents2` split barriers onto a Core 5 reaper with zero VBLANK stalls. |
 
 ### Technical Takeaway
 
@@ -39,7 +39,7 @@ Traditional emulators often suffer from instrumentation overhead because debuggi
 ## 4. Process & Engineering Workflow Comparison
 
 * **Rigorous CI/CD Hygiene Gates:** Unlike casual open-source projects that rely purely on manual pull-request reviews, Espresso Wave [AX] enforces automated static hygiene workflows (`hygiene.yml`) that audit line endings, preprocessor definitions (`NOMINMAX`, `#undef CreateEvent`), and Vulkan API compliance (`VK_NO_PROTOTYPES`) at the commit gate.
-* **Pre-Flight Hardware Gate Automation:** Features dedicated validation scripts (`run_sprint0_hardware_gate.ps1`) that verify microarchitectural invariants, timer settings (`tsc=reliable`), and shared-handle usage before a production build is packaged.
+* **Pre-Flight Hardware & Shader Gate Automation:** Features dedicated validation scripts (`Scripts/check_hardware.ps1`, `Scripts/shader_validate.ps1`, `Scripts/validate_profile.ps1`, and `Scripts/check_regression.ps1`) that verify IRQ steering, `SeLockMemoryPrivilege`, SPIR-V integrity, and PGO telemetry before a production build is packaged.
 * **Dual-Target Convergence Model:** Maintains code symmetry between a high-end desktop engine (`Espresso Wave [AX]`) and an immutable, `< 300 MB` `toram` embedded Linux appliance (`Piccolo [AX]`) from a single C++20 repository structure (`UNIFIED_MASTER_PLAN.md`).
 
 ---
@@ -48,9 +48,9 @@ Traditional emulators often suffer from instrumentation overhead because debuggi
 
 As **Eden Espresso Wave [AX]** transitions from our Stage 1 baseline (Intel i5-9600K non-SMT reference hardware) toward our generational expansion targets (Stage 2.1 i5-8600K and Stage 2.2 11th Gen Rocket Lake SMT), our primary growth vector lies in overcoming hardware rigidity without compromising sub-millisecond determinism.
 
-1. **Dynamic Silicon Introspection (`AutoDetectHostSilicon()`):**
+1. **Dynamic Silicon Introspection (`ax::topology::DetectHostSilicon()` — `[IMPLEMENTED in ax-sdk v1.35.0]`):**
    * *The Challenge:* Moving away from hardcoded hexadecimal core masks (`0x01`, `0x02`, `0x1C`, `0x20`) to safely accommodate 8-core, 16-thread, or hybrid core topologies.
-   * *The Solution:* Implementing a zero-overhead runtime topology resolver that queries physical cores versus logical SMT companion threads, dynamically mapping our `2:3:1` structural template across diverse host architectures.
+   * *The Solution:* Implemented a cached (`std::call_once`) cross-platform topology resolver (`GetLogicalProcessorInformationEx` with `LTP_PC_SMT` + `EfficiencyClass` on Windows; `/sys/devices/system/cpu` `thread_siblings_list` + `cpu_capacity` on Linux) that filters out SMT sibling threads and E-cores, dynamically scaling our `CoreRatio=2:3:1` template across diverse host architectures.
 
 2. **Eliminating End-User Configuration Friction:**
    * *The Challenge:* Preventing advanced emulation tuning from imposing an onerous manual setup burden on end users.

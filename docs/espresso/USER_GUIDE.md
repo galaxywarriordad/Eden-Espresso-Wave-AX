@@ -21,7 +21,7 @@ Operational, build automation, calibration, and troubleshooting manual for the *
 
 ### 🎯 1.1 What This Project Is
 
-**Eden Espresso Wave [AX] (Master v1.34)** is a custom, hardware-locked fork of the Eden Nintendo Switch Emulator compiled from source to partition system silicon into dedicated lanes for audio, Vulkan rendering, guest ARM64 JIT, and auxiliary background tasks—sharing a unified C++20 silicon core with the **Eden Piccolo [AX]** ($< 300\text{ MB}$ `toram` Batocera USB 3.0) appliance.
+**Eden Espresso Wave [AX] (Master v1.35)** is a custom, hardware-locked fork of the Eden Nintendo Switch Emulator compiled from source via the shared **`ax-sdk`** (`ax::core`) C++20 silicon runtime to partition system silicon into dedicated lanes for audio, Vulkan 1.4 rendering, guest ARM64 JIT, and auxiliary background tasks—sharing its core architecture with the **Eden Piccolo [AX]** ($< 300\text{ MB}$ `toram` Batocera USB 3.0) appliance.
 
 ### 🧠 1.2 Why We Are Building It This Way
 
@@ -53,20 +53,20 @@ While calibrated for the i5-9600K + GTX 980 Ti + UHD 630 + HiBy FC3 baseline, it
 
 ### 🛠️ 2.1 BIOS & Windows OS Prerequisites
 
-To run `eden.exe` at peak performance on the Master v1.34 binary, configure your system with the following BIOS and Windows settings:
+To run `eden.exe` at peak performance on the Master v1.35 binary, configure your system with the following BIOS and Windows settings:
 * **BIOS Per-Core Multiplier Overclock (Intel Core i5-9600K):** Configure core ratios (All Cores set to $x48$ / 4.8 GHz, Uncore Ring to $x43\text{--}x44$ / 4.3–4.4 GHz, AVX Offset 0) and manage power states (disable C-States / SpeedStep if hunting micro-stutters) to safeguard real-time audio deadlines.
 * **Intel UHD Graphics 630 iGPU & DVMT Pre-Allocation:** Enable *IGFX Multi-Monitor* and assign 256 MB–512 MB DVMT Pre-Allocated memory for Intel Quick Sync Video (QSV) hardware video decoding.
 * **Windows Large-Page Privilege (`SeLockMemoryPrivilege`):** Open `secpol.msc` → *Local Policies* → *User Rights Assignment* → *Lock pages in memory*, add your Windows user account, and reboot. To verify via an Administrator Command Prompt, run `whoami /priv | findstr /i "SeLockMemoryPrivilege"`. Note that Windows displays the privilege state as `Disabled` by default in `whoami /priv`—as long as the row appears in the output, your account holds the token right and `eden.exe` enables it programmatically at startup to allocate 2 MB Windows Large Pages and reduce Skylake DTLB misses.
 * **1:1 PCIe / USB / SATA Hardware IRQ Steering:** Run `Scripts\set_irq_affinity.ps1` (as Administrator) and reboot, then verify with `Scripts\check_hardware.ps1` that hardware interrupts map cleanly across CPU cores (`0x01` USB xHCI Audio, `0x02` GTX 980 Ti Vulkan, `0x20` NVMe/SATA AHCI Quarantine) to prevent `storahci.sys` DPC audio underruns.
 
 ### 🎛️ 2.2 First-Boot Emulator & Audio Calibration (Stage 0 Verification)
-* **Audio Routing:** Configure `FlexASIO.toml` with Windows WASAPI Exclusive Mode targeting the HiBy FC3 USB DAC (24-bit, 48000 Hz).
-* **Graphics & Texture Policy:** Set Vulkan on the GTX 980 Ti with Intel Quick Sync Video for hardware video decoding, managing ASTC (RGBA8 vs. BC3/BC7) recompression to stay safely beneath the 5.50 GB DXGI VRAM ceiling.
-* **Telemetry Smoke Check:** Launch `build_stage0\bin\eden.exe` and verify in Process Explorer and `build_stage_telemetry_metrics.json` that audio, graphics, guest CPU, and pipeline worker threads pin to their designated cores with `"audio_underruns": 0`.
+* **Audio Routing:** `PGO_stage0.bat` / `PGO_stage0LD.bat` automatically stage `FlexASIO.toml` (Windows WASAPI Exclusive Mode targeting the HiBy FC3 USB DAC @ 24-bit/32-bit, 48000 Hz, 128 samples / 2.67 ms) and `eden_engine.ini` (`CoreRatio=2:3:1`, `HostTimingPriorityClass=HIGH`) into `%BUILD_DIR%\bin\`.
+* **Graphics & Proactive `5.00 GiB` Async VRAM Shield:** Set Vulkan on the GTX 980 Ti with Intel Quick Sync Video for hardware video decoding. `VkVramShield` monitors `VK_EXT_memory_budget` and triggers **non-blocking asynchronous pruning at `5.00 GiB`** (`~4.50 GiB` hysteresis recovery) via `VK_QUEUE_TRANSFER_BIT` and Vulkan 1.4 split barriers (`vkCmdSetEvent2` / `vkCmdWaitEvents2`), keeping VRAM safely below the `5.50 GiB` (`5.35 GiB` LSFG) hard ceiling with zero VBLANK stalls.
+* **Telemetry Smoke Check:** Launch `build_stage0\bin\eden.exe` and verify in Process Explorer and `build_stage_telemetry_metrics.json` that audio, graphics, guest CPU, and Core 5 reaper/pipeline threads pin to their designated P-cores with `"audio_underruns": 0`.
 
 ### 🚀 2.3 Profile-Guided Optimisation (PGO) Build & Training Protocol via Master Configurator Hub
 
-The 3-stage LLVM PGO pipeline is driven by the unified **`PGO_configurator.bat`** master hub (`PGO_stage0LD.bat` → `PGO_stage1.bat` → `Scripts\validate_profile.ps1` → `PGO_stage2.bat`), linearising hot execution paths into the i5-9600K's 32 KB L1i cache via an instrumented build, `%APPDATA%\eden` environment sandboxing, $3 \times 15$-minute gameplay telemetry sweeps, and final ThinLTO production binary compilation.
+The LLVM PGO pipeline is driven by the root **`PGO_config.bat`** master hub (`PGO_stage0.bat` / `PGO_stage0LD.bat` → `PGO_stage1.bat` → `Scripts\validate_profile.ps1` → `PGO_stage2.bat`), linearising hot execution paths into the i5-9600K's 32 KB L1i cache via an instrumented build, `%APPDATA%\eden` environment sandboxing, $3 \times 15$-minute gameplay telemetry sweeps, and final production binary compilation.
 
 ---
 
@@ -106,8 +106,8 @@ Eden Espresso Wave [AX] (Master v1.34) follows a strict, six-phase engineering r
 * **🎨 Phase 2: Descriptor Throughput, Contiguity Safety & Math Acceleration (`v1.34`)**
   * *Core Engineering Focus:* Deploys a 64-byte L1-aligned Xbyak Macro-JIT emitter with strict 32-bit sign-extended branch bounds to unlock single-cycle Maxwell XMAD execution; enforces GTX 980 Ti `maxPushDescriptors` limits and physical page-contiguity checks (Citron PR #4688, #449, #383) on uniform buffer passthrough streams; adds procedural vertex-less draw fastpaths (Citron PR #448); clamps `VkImageSubresourceRange` mip/layer counts (Citron PR #385 & #447) while packing $< 16$-byte uniforms into a pre-allocated ring (`emit_spirv.cpp`); and hardens `libswresample` with AVX2 SIMD FIR filters and `SWR_DITHER_TRIANGULAR_HIGHPASS` (`aresample=async=1`) for non-48 kHz audio streams.
   * *What This Means In-Game:* Boosts frame rates in geometry- and particle-heavy scenes by slashing CPU driver validation overhead on Core 1 (`0x02`), guarantees phase-linear 24-bit/48 kHz audio resampling before hitting your HiBy FC3 DAC, and eliminates split-DMA geometry corruption and Maxwell `VK_ERROR_DEVICE_LOST` driver crashes.
-* **🎨 Phase 3: VRAM Boundaries, Config-Driven Scaling & High-Fidelity BC7/BC6H Compression (`v1.35`)**
-  * *Core Engineering Focus:* Interfaces directly with Windows DXGI (5.50 GB) and Linux `VK_EXT_memory_budget` (5.35 GB with `lsfg-vk`) counters inside VBLANK windows via rigid 64 KB block flushes/LOD scaling; backs dynamic render targets with a pre-allocated 64 KB Sparse Page-Aliased VMA pool (`VK_KHR_bind_memory2`) alongside a time-sliced Fragment-Aware Texture Reaper; uses CPU address deltas (Eden PR #32) for exact overlap invalidation; upgrades ASTC recompression from RGB 5:6:5 (BC1/BC3) to Maxwell-native BC7 (1.0 BPP 8-bit adaptive modes) and BC6H (HDR); introduces a `libswresample` software micro-pitch PLL ($\pm 0.005\%$) to absorb crystal drift; and adds the `eden_engine.ini` proportional 2:3:1 physical-core scaler plus runtime hardware capability flags.
+* **🎨 Phase 3: Proactive `5.00 GiB` Async VRAM Shield, Dynamic `2:3:1` Scaling & BC7/BC6H Compression (`v1.35`)**
+  * *Core Engineering Focus:* Deploys **`ax-sdk` (`ax::vram`, `ax::topology`, `ax::audio`)** alongside **`VkVramShield`**—triggering **non-blocking async VRAM pruning at `5.00 GiB`** (`~4.50 GiB` hysteresis recovery) ahead of the `5.50 GiB` (`5.35 GiB` LSFG) hard ceiling using dedicated `VK_QUEUE_TRANSFER_BIT` hardware DMA queues, Vulkan 1.4 `vkCmdSetEvent2` / `vkCmdWaitEvents2` split barriers, and a `VK_KHR_timeline_semaphore`-fenced Core 5 background reaper; dynamically scales `CoreRatio=2:3:1` across physical P-cores via `GetLogicalProcessorInformationEx` (`LTP_PC_SMT` + `EfficiencyClass`) and Linux `sysfs`; routes stereo audio through a 64-byte cache-line-isolated batch SPSC ring; and upgrades ASTC recompression to Maxwell-native BC7 (1.0 BPP 8-bit adaptive modes) and BC6H (HDR).
   * *What This Means In-Game:* Eliminates the colour banding seen in BC3 skyboxes and shadows while still cutting VRAM usage by $75\%$ compared to uncompressed RGBA8—eliminating mid-game `vkAllocateMemory` stalls and preventing multi-hour open-world sessions from hitting the GTX 980 Ti's 6 GB VRAM wall.
 * **🎨 Phase 4: Async Concurrency, Cross-Silicon Offloading & Reversible IRQ Steering (`v1.36`)**
   * *Core Engineering Focus:* Binds native WinRT Windows Graphics Capture (WGC) handles directly to Vulkan swapchain surfaces inside VRAM for zero-copy `lsfg-vk` frame generation (0 ms PCIe transfer); opens a secondary Vulkan Asynchronous Compute Queue (`VK_QUEUE_COMPUTE_BIT`) synchronised via timeline semaphores for ASTC → BC7 transcoding; runs COM-isolated Intel UHD 630 QSV decoding paired with FFmpeg `vpp_qsv` / `scale_qsv` hardware NV12 → BGRA conversion over zero-copy `IDXGIResource1` Windows NT Shared Handles (and VA-API `dma_buf` FDs on Piccolo); exposes native `AV_HWDEVICE_TYPE_VULKAN` (`VK_KHR_video_decode_queue`) as a zero-copy fallback decoder; and introduces a reversible runtime MSI IRQ helper (`Scripts\irq_runtime_helper.ps1`).
@@ -191,7 +191,7 @@ channels = 2
 | **Nintendo Switch 1** | $4\times$ ARM Cortex-A57 @ 1.02 GHz | NVIDIA Tegra X1 Maxwell (shared LPDDR4) | **Resource-Bound Baseline:** High efficiency, but constrained by 25.6 GB/s bandwidth. Drops to 40–45 FPS in heavy titles. |
 | **Stock Eden** | Generic ARM64 → x86-64 Dynarmic JIT; unpinned OS thread scheduling | Generic Vulkan/OpenGL translation | **Conservative Baseline:** Hits 60 FPS in lighter titles, but suffers 45–60 FPS dips and shader-compile stutters. |
 | **Citron** | Generic ARM64 → x86-64 JIT; aggressive caching without core isolation | Vulkan translation with aggressive caching | **Volatile Peak Frames:** High raw peak FPS, but uneven frametime pacing and micro-stutters during cold shader builds. |
-| **Eden Espresso Wave [AX] (Master v1.34)** | Elastic 2:3:1 Non-SMT (`0x01`, `0x02`, `0x1C`, `0x20`) + 1-cycle BMI1 + 2 MB Large Pages + PGO L1i | GTX 980 Ti on Core 1 + UBO Templates + Intel UHD 630 QSV Offload + 5.50 GB DXGI VRAM Shield | **Locked Console-Grade Consistency:** Rock-solid 60 FPS at $2\times$/$3\times$ with flat frametimes and bit-perfect HiBy FC3 audio. |
+| **Eden Espresso Wave [AX] (Master v1.34)** | Elastic 2:3:1 Non-SMT (`0x01`, `0x02`, `0x1C`, `0x20`) + 1-cycle BMI1 + 2 MB Large Pages + PGO L1i | GTX 980 Ti on Core 1 + UBO Templates + Intel UHD 630 QSV Offload + 5.00 GiB proactive async VRAM Shield | **Locked Console-Grade Consistency:** Rock-solid 60 FPS at $2\times$/$3\times$ with flat frametimes and bit-perfect HiBy FC3 audio. |
 | **Nintendo Switch 2** | $8\times$ ARM Cortex-A78C @ $\sim 2.1\text{ GHz}$ | Custom NVIDIA Ampere (native ASTC & DLSS) | **Brute-Force Native Compatibility:** Locks struggling titles to 60 FPS out-of-the-box via raw ARM/Ampere throughput. |
 
 ### 6.2 Telemetry Verification & Troubleshooting Quick-Reference
@@ -217,9 +217,9 @@ channels = 2
 | **Ninja** | Ninja 1.11+ (`ninja -j 4` recommended) | Executes parallel dependency builds while leaving 2 cores free for OS/disk I/O. |
 | **PowerShell** | PowerShell 5.1+ / 7+ (`ExecutionPolicy Bypass`) | Drives workspace purging, hardware auditing, performance telemetry, and PGO trace validation. |
 
-### 7.2 Master Configurator Hub (`PGO_configurator.bat`) & End-to-End Build Process
+### 7.2 Master Configurator Hub (`PGO_config.bat`) & End-to-End Build Process
 
-The unified master hub (`PGO_configurator.bat`) orchestrates all pipeline stages. All build scripts feature a fixed **row 45 VT100 scroll-region lock** (`%ESC%[45;r%ESC%[45;1H`) to protect the Espresso AX banner and optimization feature lists from being overwritten by streaming build logs:
+The unified root master hub (**`PGO_config.bat`**) orchestrates all pipeline stages (`[0]` `PGO_stage0.bat`, `[0LD]` `PGO_stage0LD.bat`, `[1]` `PGO_stage1.bat`, `[2]` `PGO_stage2.bat`, `[CA]` `clean_all.ps1`). Build scripts feature a fixed **row 45 VT100 scroll-region lock** (`%ESC%[45;r%ESC%[45;1H`) to protect the Espresso AX banner and optimization feature lists from being overwritten by streaming build logs:
 
 ```text
 [ 1. WORKSPACE PURGE ]        [ 2. STAGE 0 CONTROL ]         [ 3. STAGE 1 INSTRUMENT ]       [ 4. STAGE 2 FINAL BAKE ]
@@ -257,7 +257,7 @@ The unified master hub (`PGO_configurator.bat`) orchestrates all pipeline stages
 ### 8.3 Only the First Step: The Path Ahead
 Getting `eden.exe` built, partitioned, and running is only the first step. The road ahead turns a custom binary into a self-tuning console appliance:
 * **PGO Telemetry Baking (Stage 1 → Stage 2):** Capturing real gameplay branch profiles across your library.
-* **Maxwell Throughput & BC7/BC6H Fidelity (Phases 2 & 3):** Deploying 32-bit Macro-JIT emitters, page-contiguity UBO streams, a 5.50 GB DXGI VRAM shield, and near-lossless BC7 / BC6H texture compression.
+* **Maxwell Throughput & BC7/BC6H Fidelity (Phases 2 & 3):** Deploying 32-bit Macro-JIT emitters, page-contiguity UBO streams, a 5.00 GiB proactive async VRAM shield, and near-lossless BC7 / BC6H texture compression.
 * **Heterogeneous Silicon & Closed-Loop Polish (Phases 4, 5 & 6):** Unlocking zero-copy WinRT WGC frame generation, asynchronous compute queues, predictive HDD-to-NVMe pre-faulting, the $< 300\text{ MB}$ `toram` Eden Piccolo [AX] USB appliance, and live background superblock re-compilation.
 
 *Thank you for being part of this build—now let's fire up `build_stage0\bin\eden.exe` and watch the silicon sing!*[cite: 13]

@@ -1,8 +1,8 @@
-# 🌐 Unified Dual-Target Master Plan (v1.3)
+# 🌐 Unified Dual-Target Master Plan (v1.4)
 
-**Updated:** `2026-11-17` (Post-Recovery Clean Build, Shader Macro Harmonization & Pipeline Telemetry Sprint)
+**Updated:** `2026-11-19` (Post-`ax-sdk v1.35.0`, Proactive `5.00 GiB` Async VRAM Shield & Vulkan 1.4 Split-Barrier Sprint)
 
-This master plan consolidates **Eden Espresso Wave [AX]** (Windows 10 desktop build, `MASTER v1.34` → `v2.00`) and **Eden Piccolo [AX]** (Batocera Linux USB 3.0 appliance, `v0.6` → `v2.00`) into a single coordinated C++20 engineering programme. Rather than maintaining divergent forks, both targets compile from one shared silicon core while isolating OS-specific primitives behind `#ifdef _WIN32` and `#ifdef __linux__` platform shims.
+This master plan consolidates **Eden Espresso Wave [AX]** (Windows 10/11 desktop build, `MASTER v1.35` → `v2.00`) and **Eden Piccolo [AX]** (Batocera Linux USB 3.0 appliance, `v0.6` → `v2.00`) into a single coordinated C++20 engineering programme powered by the shared MIT-licensed **`ax-sdk` (`ax::core`)** silicon runtime, while isolating OS-specific drivers and video/audio handles behind `#ifdef _WIN32` and `#ifdef __linux__` shims.
 
 ## 📑 Table of Contents
 - [Chapter 1: Dual-Target Convergence Architecture (Espresso Wave [AX] + Piccolo [AX])](#-chapter-1-dual-target-convergence-architecture-espresso-wave-ax--piccolo-ax)
@@ -35,8 +35,8 @@ Both **Eden Espresso Wave [AX]** (Windows 10) and **Eden Piccolo [AX]** (Batocer
 | :--- | :--- | :--- |
 | **Virtual Memory & BMI1 Translation** | `device_memory.h/.cpp`, `bmi_util.h`, `memory.h/.cpp`, `device_memory_manager.h/.cpp` | Reserves a 512 GB contiguous guest virtual address space (`1ULL << 39`); performs single-cycle page extraction via 3-arg BMI1 `_bextr_u64(vaddr, YUZU_PAGEBITS, 36)`; uses split $O(1)$ vs. `MULTI_FLAG` GMMU resolution and incorporates **Eden PR #3817** (`HeapTracker` leak removal). |
 | **Lock-Free Dirty Memory Tracking** | `gpu_dirty_memory_manager.h/.cpp` | Tracks dirty pages on guest threads via 8-byte `TransformAddress` weak-CAS (`compare_exchange_weak`); executes zero-copy `front_buffer.swap(back_buffer)` and `TZCNT`/`BLSR` bit-scans inside `Gather()` on Core 1 (`0x02`). |
-| **Fiber Scheduler & Fibonacci Timeline** | `cpu_manager.h/.cpp`, `core_timing.h/.cpp`, `speed_limiter.h/.cpp`, `eden_engine.ini` | Schedules user-mode `Common::Fiber` contexts across a home-biased `0x1C` pool (`C0` → `0x04`, `C1` → `0x08`, `C2` → `0x10`) with Core 3 elastic spillover (`0x3C`) and config-driven 2:3:1 physical P-core scaling; drives `CoreTiming` via an $O(1)$ Boost Fibonacci Heap protected by `std::scoped_lock{advance_lock, basic_lock}`. |
-| **Zero-Heap Audio DSP Graph & Micro-PLL** | `audio_core.h/.cpp`, `system_manager.h/.cpp`, `command_generator.h/.cpp`, `lockfree_audio_queue.hpp` | Runs an inline `std::optional` `AudioManager` and ADSP microkernel backed by a 64B-aligned lock-free PCM ring (2048 slots), `WorkbufferAllocator` + `std::construct_at`, and `0xCAFEBABE` command validation; uses `libswresample` AVX2 FIR (`SWR_DITHER_TRIANGULAR_HIGHPASS`) as a software micro-pitch PLL ($\pm 0.005\%$) driven by ring-buffer fill watermarks to absorb Z390-to-DAC crystal drift, plus **Eden PR #2** biquad bounds checks. |
+| **Dynamic `2:3:1` Topology & Fiber Timeline** | `ax-sdk/src/topology.cpp`, `cpu_manager.h/.cpp`, `core_timing.h/.cpp`, `eden_engine.ini` | Enumerates physical P-cores via `GetLogicalProcessorInformationEx` (`LTP_PC_SMT` + `EfficiencyClass`) and Linux `sysfs` (`thread_siblings_list` + `cpu_capacity`), enforcing `CoreRatio=2:3:1` (`0x01`/`0x02`/`0x1C`/`0x20` on `i5-9600K`) and `HostTimingPriorityClass=HIGH` + MMCSS `Pro Audio` (with RAII `AvRevertMmThreadCharacteristics` cleanup); drives `CoreTiming` via an $O(1)$ Boost Fibonacci Heap protected by `std::scoped_lock{advance_lock, basic_lock}`. |
+| **Zero-Heap Audio DSP & Batch SPSC Ring** | `ax-sdk/include/ax/audio.hpp`, `lockfree_audio_queue.hpp`, `system_manager.h/.cpp` | Runs an inline `std::optional` `AudioManager` and ADSP microkernel backed by `ax-sdk`'s 64-byte cache-line-isolated `LockFreeStereoRing<2048, float>` (`PushBatch`, `PopBatch`, `PopPlanarBatch` for Steinberg ASIO Left/Right de-interleave) with contiguous `std::memcpy` transfers and per-callback telemetry accounting; uses `libswresample` AVX2 FIR (`SWR_DITHER_TRIANGULAR_HIGHPASS`) as a software micro-pitch PLL ($\pm 0.005\%$) plus **Eden PR #2** biquad bounds checks. |
 | **Maxwell GM200 Vulkan, Sparse VMA & Shader Safety** | `macro_jit_compiler.cpp`, `vk_ubo_passthrough.cpp`, `vk_texture_cache.cpp`, `texture_cache.h`, `emit_spirv.cpp`, `texture_reaper.cpp` | Emits 64B-aligned, 32-bit sign-extended Xbyak GPU Macro-JIT code; enforces page-contiguity UBO passthrough and `maxPushDescriptors` clamps (**Citron PR #4688, #449, #383**), procedural draw fastpaths (**#448**), subresource clamps (**#385, #447**), and `128 MiB` / `16 MiB` / 128-slice unswizzle limits; backs dynamic render targets with a 64 KB Sparse Page-Aliased VMA pool (`VK_KHR_bind_memory2`) to eliminate mid-game `vkAllocateMemory` stalls; supports `BC3`/`BC7`/`BC6H` plus Option C `< 4.5 GB` `RGBA8`, `emit_spirv.cpp` `lmem` register-spill condensation, uniform `#version 460 core` + `GL_GOOGLE_include_directive` shader headers, and **Eden PR #32** CPU-delta overlap invalidation. |
 | **Quarantine Workers, Loading Burst & Telemetry** | `ncz_decompressor.cpp`, `vk_pipeline_worker.h/.cpp`, `vk_cache_decompression.cpp`, `perf_stats.h/.cpp` | Quarantines background tasks onto Core 5 (`0x20`) via `ScopedNczQuarantine`, with loading-screen core bursting across `0x1C` before guest fibers spin up for $3\times$ faster `.ncz` extraction; enforces `ASYNC_WORKER_CORE_CLAMP = 1`, 32B-aligned AVX2 non-temporal cache decompression (`_mm256_stream_si256` + `_MM_HINT_NTA`), and `FFmpeg::execute2` slice routing; exports lock-free `g_metrics` atomic counters consumed by `telemetry_daemon.ps1`. |
 
@@ -52,11 +52,11 @@ Both **Eden Espresso Wave [AX]** (Windows 10) and **Eden Piccolo [AX]** (Batocer
 | **Sub-Microsecond Frame Pacing** | `timeBeginPeriod(1)` + `CreateWaitableTimerExW(..., HIGH_RESOLUTION)` + `_mm_pause()` spin tail | `clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, ...)` down to `150 µs` before VBLANK + calibrated `_mm_pause()` spin tail | Achieves `< 1 µs` frame-pacing accuracy without burning 100% CPU in busy-wait loops. |
 | **Direct USB HID & Exit Combo** | Win32 `RawInput` / `hidapi` pinned to Core 5 (`0x20`) | Core 5 `SCHED_FIFO 80` `/dev/hidraw*` reader (`usbhid.jspoll=1`, `-1.5 ms` VBLANK latch + `Select+Start` 1.5s exit hook) | Shaves 1–2 frames off input-to-photon latency and provides keyboard-free console exit on bare Xorg. |
 
-### 📌 Shim 2: `src/video_core/renderer_vulkan/vk_vram_shield.hpp` (VRAM Budget & Frame Gen)
+### 📌 Shim 2: `src/video_core/renderer_vulkan/vk_vram_shield.hpp` & `ax-sdk/include/ax/vram.hpp` (Async `5.00 GiB` VRAM Shield)
 
 | Capability | `#ifdef _WIN32` (Espresso Wave [AX]) | `#ifdef __linux__` (Piccolo [AX]) | Architectural Equivalence |
 | :--- | :--- | :--- | :--- |
-| **VRAM Over-Subscription Guard** | `IDXGIAdapter3::QueryVideoMemoryInfo` polled at VBLANK (`5.50 GB` ceiling; `5.20 GB` with Lossless Scaling) | `VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT` + VBLANK `VK_EXT_memory_budget` poll (`5.50 GB` ceiling; `5.35 GB` with `lsfg-vk 2.0.0+`) | Prevents WDDM/NVIDIA system-RAM VRAM paging stalls (`20–45 ms` freezes) via 64 KB sparse VMA aliasing & `< 64 KB` defragmentation. |
+| **Proactive `5.00 GiB` Async VRAM Reaper** | `ax::vram::EvaluateBudget()` (`5.00 GiB` `kPruneTriggerBytes` / `~4.50 GiB` recovery) + `VK_EXT_memory_budget` (`5.50 GiB` / `5.20 GiB` Win32 LS ceiling) | `ax::vram::EvaluateBudget()` (`5.00 GiB` `kPruneTriggerBytes` / `~4.50 GiB` recovery) + `VK_EXT_memory_budget` (`5.50 GiB` / `5.35 GiB` `lsfg-vk 2.0.0+` ceiling) | Eliminates VBLANK eviction stalls and WDDM/NVIDIA system-RAM paging (`20–45 ms` freezes) via dedicated `VK_QUEUE_TRANSFER_BIT`, Vulkan 1.4 `vkCmdSetEvent2` → `vkCmdWaitEvents2` split barriers, and a `VK_KHR_timeline_semaphore`-fenced Core 5 background reaper. |
 | **Frame Generation Interop** | Native Win32 `Lossless.dll` via zero-copy WinRT `Windows.Graphics.Capture` (`vk_wgc_capture.cpp`) | Implicit Vulkan 1.2 bindless layer `lsfg-vk 2.0.0+` (forced FP32 shader path for Maxwell GM200, BYO Steam `Lossless.dll`) on bare uncomposited Xorg | Delivers $2\times$ interpolated smoothness while avoiding Maxwell's throttled 1:64 FP16 ALUs. |
 
 ### 📌 Shim 3: `src/video_core/host1x/vaapi_dmabuf_bridge.hpp` (Cross-GPU Video & VME Offload)
@@ -87,15 +87,25 @@ Both **Eden Espresso Wave [AX]** (Windows 10) and **Eden Piccolo [AX]** (Batocer
 Both **Eden Espresso Wave [AX]** (Windows 10) and **Eden Piccolo [AX]** (Batocera Linux USB Appliance) build from one unified C++20 repository (`Eden4CoffeeLake` / `Eden-Espresso-Wave-AX`):
 
 ```text
+ax-sdk/                                 # Shared MIT-licensed C++20 silicon core (FetchContent / Buildroot)
+├── CMakeLists.txt                      # Exports ax::core & ax::sdk (winmm/avrt/psapi on Win32; pthread/dl on Linux)
+├── include/ax/
+│   ├── vram.hpp                        # 5.00 GiB proactive prune watermark (kPruneTriggerBytes) + hysteresis
+│   ├── topology.hpp                    # AudioTiming, VulkanSubmission, GuestJit, Housekeeping domains
+│   ├── audio.hpp                       # 64B cache-line-padded LockFreeStereoRing (memcpy + PopPlanar)
+│   ├── memory.hpp                      # 1G/2M HugeTLB & BMI1 _bextr_u64 helpers
+│   └── igpu.hpp                        # Intel UHD 630 bandwidth & DMA-BUF modifier guardrails
+└── src/topology.cpp                    # Win32 GetLogicalProcessorInformationEx + Linux sysfs 2:3:1 P-core scaler
+
 Eden-Espresso-Wave-AX/
 ├── .gitattributes                      # Enforces CRLF on *.bat/*.ps1; LF on C++/MD/Shell/Buildroot files
-├── ARCHITECTURE_SPEC.md                # Windows Espresso Wave [AX] Master Spec (v1.34)
-├── EDEN_PICCOLO_SPEC.md                # Linux Piccolo [AX] Appliance Spec (v0.5)
-├── UNIFIED_MASTER_PLAN.md              # Dual-Target Convergence Master Plan (v1.3)
-├── BACKLOG.md                          # Cross-Synced Engineering Backlog (v1.34 -> v2.00)
-├── WhatsNext.md                        # Active Rolling Sprint Plan (v1.34)
-├── eden_engine.ini                     # Runtime 2:3:1 physical-core scaler & hardware feature flags
-├── CMakeLists.txt                      # Unified CMake 3.28+ entry (WIN32 vs. LINUX target switches)
+├── ARCHITECTURE_SPEC.md                # Windows Espresso Wave [AX] Master Spec (Master v1.35)
+├── EDEN_PICCOLO_SPEC.md                # Linux Piccolo [AX] Appliance Spec (v0.6)
+├── UNIFIED_MASTER_PLAN.md              # Dual-Target Convergence Master Plan (v1.4)
+├── BACKLOG.md                          # Cross-Synced Engineering Backlog (v1.35 -> v2.00)
+├── WhatsNext.md                        # Active Rolling Sprint Plan (v1.35)
+├── eden_engine.ini                     # Runtime CoreRatio=2:3:1, HostTimingPriorityClass=HIGH & hardware flags
+├── externals/CMakeLists.txt            # FetchContent ax_sdk (cross-host) + WIN32-gated asio_sdk & FlexASIO
 ├── PGO_config.bat                      # Interactive build configurator, IRQ auditor & PGO stage launcher
 ├── src/
 │   ├── common/
