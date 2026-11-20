@@ -9,7 +9,7 @@ for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "Add-Type -AssemblyName System.Windows.Forms;" ^
     "$w_code = '[DllImport(\"user32.dll\")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);';" ^
-    "Add-Type -TypeDefinition $w_code -Name WWindowUtil -Namespace Win32 >$null;" ^
+    "Add-Type -MemberDefinition $w_code -Name WWindowUtil -Namespace Win32 >$null;" ^
     "Start-Sleep -Milliseconds 150;" ^
     "$h = (Get-Process -Id $PID).MainWindowHandle;" ^
     "if ($h -ne [IntPtr]::Zero) {" ^
@@ -22,6 +22,9 @@ set "SCRIPT_DIR=%~dp0"
 for %%i in ("%SCRIPT_DIR%..") do set "PROJ_DIR=%%~fi"
 if "%PROJ_DIR:~-1%"=="\" set "PROJ_DIR=%PROJ_DIR:~0,-1%"
 set "LLVM_PROJ_DIR=%PROJ_DIR:\=/%"
+
+call "%SCRIPT_DIR%resolve_ax_tools.bat"
+if !errorlevel! neq 0 exit /b 1
 
 set "VSCMD_ARG_TGT_ARCH=x64"
 set "VSCMD_ARG_HOST_ARCH=x64"
@@ -44,20 +47,20 @@ set "PATH=C:\Program Files\CMake\bin;C:\Program Files\LLVM\bin;C:\Program Files\
 set "QT_ENABLE_HIGHDPI_SCALING=1"
 set "QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough"
 
-set "BASE_GAME_DIR=J:\Switch"
-set "SSD_STAGING_DIR=E:\updates"
+if not defined BASE_GAME_DIR set "BASE_GAME_DIR=J:\Switch"
+if not defined SSD_STAGING_DIR set "SSD_STAGING_DIR=E:\updates"
 echo [STATUS] Evaluating dual-storage target path layouts...
-if not exist "%BASE_GAME_DIR%" echo [@=FATAL] MECHANICAL TARGET DIRECTORY UNREACHABLE - DRIVE MOUNT MISSING. & exit /b 1
+if not exist "%BASE_GAME_DIR%" echo [WARN] Mechanical archive directory (%BASE_GAME_DIR%) not mounted - continuing build.
 if not exist "%SSD_STAGING_DIR%" mkdir "%SSD_STAGING_DIR%" 2>nul
 
 cd /d "%PROJ_DIR%"
 
-echo [STATUS] Executing absolute workspace purge sequence...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%clean_all.ps1"
+echo [STATUS] Executing synchronous workspace purge sequence...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%AX_TOOLS_DIR%\clean_all.ps1" -ProjDir "%PROJ_DIR%" -Wait
 if !errorlevel! neq 0 exit /b 1
 
 echo [STATUS] Verifying host hardware topology compliance...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%check_hardware.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%AX_TOOLS_DIR%\check_hardware.ps1" -TargetApp eden -RepoRoot "%PROJ_DIR%"
 if !errorlevel! neq 0 exit /b !errorlevel!
 
 echo [STATUS] Running shader macro harmonization...
@@ -84,7 +87,7 @@ echo                      ^(   ^(   ^(
 echo                       ^)   ^)   ^)             PGO Phase 1 ^(Instrumentation Mode^)
 echo                  ._________________.
 echo                 /  ###############  \         --------------------------------------------
-echo                /   ###############   \---\      === Eden ESPRESSO WAVE [AX] v1.3 ===
+echo                /   ###############   \---\      === Eden ESPRESSO WAVE [AX] v1.35 ===
 echo               /    ###############    \   \   --------------------------------------------
 echo              /     ###############     /  /   CPU: Intel 9600k Coffee Lake Baseline ^(Skylake ISA^)
 echo              \     ###############    /  /    GPU: NVIDIA Maxwell GTX 980Ti
@@ -105,19 +108,8 @@ taskkill /f /im clang-cl.exe >nul 2>&1
 taskkill /f /im lld-link.exe >nul 2>&1
 
 if exist "%VERBOSE_LOG%" del /f /q "%VERBOSE_LOG%" >nul 2>&1
-
-if exist "%BUILD_DIR%" (
-    rmdir /s /q "%BUILD_DIR%" >nul 2>&1
-    if exist "%BUILD_DIR%" (
-        timeout /t 2 /nobreak >nul
-        rmdir /s /q "%BUILD_DIR%"
-        if exist "%BUILD_DIR%" (
-            echo [@=FATAL] CRITICAL DIRECTORY LOCK ENCOUNTERED - UNABLE TO PURGE WORKSPACE BUILD TREE.
-            exit /b 1
-        )
-    )
-)
-mkdir "%BUILD_DIR%"
+if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
+if not exist "%PROJ_DIR%\pgo_data" mkdir "%PROJ_DIR%\pgo_data"
 
 echo =================================================== > "%VERBOSE_LOG%"
 echo  EDEN EMULATOR PIPELINE DIAGNOSTIC REPORT          >> "%VERBOSE_LOG%"
@@ -144,13 +136,17 @@ cd /d "%BUILD_DIR%"
 if not exist "%BUILD_DIR%\build.ninja" goto :cmake_fail
 
 echo [STATUS] Launching live instrumentation build engine loop...
-for /f "usebackq tokens=1" %%p in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.Windows.Forms; $p = Start-Process powershell -ArgumentList '-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-File','\"%SCRIPT_DIR%track_telemetry.ps1\"' -WindowStyle Normal -PassThru; $w_code = '[DllImport(\''user32.dll'\')] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);'; Add-Type -TypeDefinition $w_code -Name WUtil -Namespace Win32 >$null; Start-Sleep -Milliseconds 400; $h = (Get-Process -Name powershell | Where-Object { $_.MainWindowTitle -match 'Telemetry' -or $_.Id -eq $p.Id }).MainWindowHandle; if ($h -ne [IntPtr]::Zero) { [Win32.WUtil]::MoveWindow($h, [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width - 850, 40, 820, 480, $true) >$null }; $p.Id"`) do (set "TELEMETRY_PID=%%p")
+for /f "usebackq tokens=1" %%p in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.Windows.Forms; $p = Start-Process powershell -ArgumentList '-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-File','\"%AX_TOOLS_DIR%\track_telemetry.ps1\"','-ProcessName','eden','-ConfigPath','\"%PROJ_DIR%\ax_engine.ini\"','-OutputJsonPath','\"%PROJ_DIR%\build_stage_telemetry_metrics.json\"' -WindowStyle Normal -PassThru; $w_code = '[DllImport(\''user32.dll'\')] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);'; Add-Type -MemberDefinition $w_code -Name WUtil -Namespace Win32 >$null; Start-Sleep -Milliseconds 400; $h = (Get-Process -Name powershell | Where-Object { $_.MainWindowTitle -match 'TELEMETRY' -or $_.Id -eq $p.Id }).MainWindowHandle; if ($h -ne [IntPtr]::Zero) { [Win32.WUtil]::MoveWindow($h, [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width - 850, 40, 820, 480, $true) >$null }; $p.Id"`) do (set "TELEMETRY_PID=%%p")
 
 powershell -NoProfile -Command "ninja -j 4 2>&1 | Tee-Object -FilePath '%VERBOSE_LOG%' -Append"
 if not exist "%BUILD_DIR%\bin\eden.exe" goto :ninja_fail
 
+if exist "%PROJ_DIR%\ax_engine.ini" copy /Y "%PROJ_DIR%\ax_engine.ini" "%BUILD_DIR%\bin\ax_engine.ini" >nul
+if exist "%PROJ_DIR%\eden_engine.ini" copy /Y "%PROJ_DIR%\eden_engine.ini" "%BUILD_DIR%\bin\eden_engine.ini" >nul
+if exist "%PROJ_DIR%\src\audio_core\FlexASIO.toml" copy /Y "%PROJ_DIR%\src\audio_core\FlexASIO.toml" "%BUILD_DIR%\bin\FlexASIO.toml" >nul
+
 echo [STATUS] Running post-build telemetry regression check...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%check_regression.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%AX_TOOLS_DIR%\check_regression.ps1" -RepoRoot "%PROJ_DIR%" -BaselineJson "%PROJ_DIR%\baseline_telemetry.json" -CurrentJson "%PROJ_DIR%\build_stage_telemetry_metrics.json"
 if !errorlevel! neq 0 goto :ninja_fail
 
 echo.
@@ -172,10 +168,10 @@ goto :error_exit
 
 :error_exit
 if defined TELEMETRY_PID taskkill /f /pid %TELEMETRY_PID% >nul 2>&1
-taskkill /f /fi "WINDOWTITLE eq EDEN ASYNCHRONOUS PIPELINE TELEMETRY DAEMON NODE ACTIVE*" >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq *ASYNCHRONOUS PIPELINE TELEMETRY DAEMON*" >nul 2>&1
 if defined CI_RUNNER_ACTIVE ( exit /b 1 ) else ( pause & exit /b 1 )
 
 :exit_pipeline
 if defined TELEMETRY_PID taskkill /f /pid %TELEMETRY_PID% >nul 2>&1
-taskkill /f /fi "WINDOWTITLE eq EDEN ASYNCHRONOUS PIPELINE TELEMETRY DAEMON NODE ACTIVE*" >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq *ASYNCHRONOUS PIPELINE TELEMETRY DAEMON*" >nul 2>&1
 exit /b 0

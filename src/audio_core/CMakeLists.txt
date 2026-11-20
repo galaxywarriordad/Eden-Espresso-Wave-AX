@@ -228,6 +228,9 @@ endif()
 
 target_include_directories(audio_core PRIVATE ${OPUS_INCLUDE_DIRS})
 target_link_libraries(audio_core PUBLIC common core Opus::opus)
+if (TARGET ax::core)
+    target_link_libraries(audio_core PRIVATE ax::core)
+endif()
 
 if (ENABLE_CUBEB)
     target_sources(audio_core PRIVATE

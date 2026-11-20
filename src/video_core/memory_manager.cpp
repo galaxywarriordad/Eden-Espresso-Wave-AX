@@ -238,8 +238,7 @@ T MemoryManager::Read(GPUVAddr addr) const {
         return value;
     }
 
-    ASSERT(false);
-
+    LOG_DEBUG(HW_GPU, "Unmapped GPU read at address={:#x}", addr);
     return {};
 }
 

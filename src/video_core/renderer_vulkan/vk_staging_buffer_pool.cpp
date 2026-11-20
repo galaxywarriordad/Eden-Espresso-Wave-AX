@@ -41,6 +41,10 @@ constexpr VkDeviceSize MAX_STREAM_BUFFER_SIZE = 256_MiB;
 
 size_t GetStreamBufferSize(const Device& device) {
     if (!device.HasDebuggingToolAttached()) {
+        if (device.IsNvidia() &&
+            device.GetNvidiaArch() == NvidiaArchitecture::Arch_Maxwell) {
+            return 128_MiB;
+        }
         return MAX_STREAM_BUFFER_SIZE;
     }
 

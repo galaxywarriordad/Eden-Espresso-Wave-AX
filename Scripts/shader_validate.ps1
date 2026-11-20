@@ -31,16 +31,22 @@ $shaderFiles = Get-ChildItem -Path $ShaderDir -Recurse -Filter *.frag | Where-Ob
 }
 
 $errors = 0
+$tempSpv = Join-Path $env:TEMP "eden_validate.spv"
 
 foreach ($file in $shaderFiles) {
     $ErrorActionPreference = "Continue"
-    $result = & $glslang -V --quiet @includeArgs -DUseUniformBlock=1 --target-env spirv1.3 $file.FullName 2>&1
+    $result = & $glslang -V --quiet @includeArgs -DUseUniformBlock=1 --target-env spirv1.3 -o $tempSpv $file.FullName 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[shader_validate] FAILED: $($file.Name)" -ForegroundColor Red
         $result | ForEach-Object { Write-Host "  $_" }
         $errors++
     }
 }
+
+if (Test-Path -Path $tempSpv) {
+    Remove-Item -Path $tempSpv -Force -ErrorAction SilentlyContinue
+}
+
 
 if ($errors -gt 0) {
     Write-Host "[shader_validate] $errors shader(s) failed validation." -ForegroundColor Red

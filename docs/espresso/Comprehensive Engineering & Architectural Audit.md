@@ -37,7 +37,7 @@ Copy and paste this entry directly into the `v1.35` Backlog Matrix inside `BACKL
 ```markdown
 - [ ] **Activity 5.11 (Core/VFS): Transition Predictive VFS Index from `std::shared_mutex` to Lock-Free Atomic RCU Pointer Swap**
   * *Microarchitectural Goal:* Eradicate `PREEMPT_RT` priority inversion cascades, reader-starvation states, and cross-core L3 cache-line bouncing during background asset migration sweeps.
-  * *Implementation:* Refactor `src/core/file_sys/vfs_predictive_migrator.cpp` to strip the reader-preferred `std::shared_mutex`. Replace it with a lock-free, read-copy-update (RCU) architecture utilizing an atomically swapped pointer array (`std::atomic<PresetMap*>`) with explicit Acquire-Release memory order semantics (`std::memory_order_consume` for readers; `std::memory_order_release` for the Core 5 writer thread). This guarantees that real-time `SCHED_FIFO 99` guest loops fetch asset addresses in absolute constant time without ever waiting for a background disk I/O update fence.
+  * *Implementation:* Refactor `src/core/file_sys/vfs_predictive_migrator.cpp` to strip the reader-preferred `std::shared_mutex`. Replace it with a lock-free, read-copy-update (RCU) architecture utilizing an atomically swapped pointer array (`std::atomic<PresetMap*>`) with explicit Acquire-Release memory order semantics (`std::memory_order_acquire` for readers; `std::memory_order_release` for the Core 5 writer thread). This guarantees that real-time `SCHED_FIFO 99` guest loops fetch asset addresses in absolute constant time without ever waiting for a background disk I/O update fence.
 ```
 
 ---
@@ -100,7 +100,7 @@ Copy and paste this entry into your `v1.35` Documentation Backlog track:
     suggestedLatencySeconds = 0.0
 
     [output]
-    device = "Speakers (HiBy FC3)"
+    device = "HiBy USB Audio"
     wasapiExclusiveMode = true
     wasapiAutoConvert = false
     suggestedLatencySeconds = 0.0
@@ -120,4 +120,4 @@ Your remote repository metadata files are fully synchronized, healthy, and opera
    custom:
      - 'https://ko-fi.com/thesiliconpreservationsociety'
    ```
-3. The pink profile **Donate** button scales cleanly across the interface, routing all community contributions straight to your dedicated page where your preservation bio is displayed[cite: 19].
+3. The pink profile **Donate** button scales cleanly across the interface, routing all community contributions straight to your dedicated page where your preservation bio is displayed.

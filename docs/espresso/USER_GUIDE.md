@@ -38,7 +38,7 @@ The architecture is specifically tailored around a reference workstation configu
 
 ### 🧩 1.4 Compatible Hardware Matrix & Architectural Adaptation Guide
 
-While calibrated for the i5-9600K + GTX 980 Ti + UHD 630 + HiBy FC3 baseline, its modular architecture adapts cleanly to alternative hardware configurations via manual core masks or the upcoming `eden_engine.ini` proportional 2:3:1 physical-core scaler (`v1.35`).
+While calibrated for the i5-9600K + GTX 980 Ti + UHD 630 + HiBy FC3 baseline, its modular architecture adapts cleanly to alternative hardware configurations via manual core masks or the upcoming `ax_engine.ini` proportional 2:3:1 physical-core scaler (`v1.35`).
 
 | Hardware Component | Baseline Target | Compatible Alternatives | Adaptation / Core Mask Strategy |
 | :--- | :--- | :--- | :--- |
@@ -57,12 +57,12 @@ To run `eden.exe` at peak performance on the Master v1.35 binary, configure your
 * **BIOS Per-Core Multiplier Overclock (Intel Core i5-9600K):** Configure core ratios (All Cores set to $x48$ / 4.8 GHz, Uncore Ring to $x43\text{--}x44$ / 4.3–4.4 GHz, AVX Offset 0) and manage power states (disable C-States / SpeedStep if hunting micro-stutters) to safeguard real-time audio deadlines.
 * **Intel UHD Graphics 630 iGPU & DVMT Pre-Allocation:** Enable *IGFX Multi-Monitor* and assign 256 MB–512 MB DVMT Pre-Allocated memory for Intel Quick Sync Video (QSV) hardware video decoding.
 * **Windows Large-Page Privilege (`SeLockMemoryPrivilege`):** Open `secpol.msc` → *Local Policies* → *User Rights Assignment* → *Lock pages in memory*, add your Windows user account, and reboot. To verify via an Administrator Command Prompt, run `whoami /priv | findstr /i "SeLockMemoryPrivilege"`. Note that Windows displays the privilege state as `Disabled` by default in `whoami /priv`—as long as the row appears in the output, your account holds the token right and `eden.exe` enables it programmatically at startup to allocate 2 MB Windows Large Pages and reduce Skylake DTLB misses.
-* **1:1 PCIe / USB / SATA Hardware IRQ Steering:** Run `Scripts\set_irq_affinity.ps1` (as Administrator) and reboot, then verify with `Scripts\check_hardware.ps1` that hardware interrupts map cleanly across CPU cores (`0x01` USB xHCI Audio, `0x02` GTX 980 Ti Vulkan, `0x20` NVMe/SATA AHCI Quarantine) to prevent `storahci.sys` DPC audio underruns.
+* **1:1 PCIe / USB / SATA Hardware IRQ Steering:** Run `%AX_TOOLS_DIR%\set_irq_affinity.ps1` (as Administrator) and reboot, then verify with `%AX_TOOLS_DIR%\check_hardware.ps1` that hardware interrupts map cleanly across CPU cores (`0x01` USB xHCI Audio, `0x02` GTX 980 Ti Vulkan, `0x20` NVMe/SATA AHCI Quarantine) to prevent `storahci.sys` DPC audio underruns.
 
 ### 🎛️ 2.2 First-Boot Emulator & Audio Calibration (Stage 0 Verification)
 * **Audio Routing:** `PGO_stage0.bat` / `PGO_stage0LD.bat` automatically stage `FlexASIO.toml` (Windows WASAPI Exclusive Mode targeting the HiBy FC3 USB DAC @ 24-bit/32-bit, 48000 Hz, 128 samples / 2.67 ms) and `eden_engine.ini` (`CoreRatio=2:3:1`, `HostTimingPriorityClass=HIGH`) into `%BUILD_DIR%\bin\`.
 * **Graphics & Proactive `5.00 GiB` Async VRAM Shield:** Set Vulkan on the GTX 980 Ti with Intel Quick Sync Video for hardware video decoding. `VkVramShield` monitors `VK_EXT_memory_budget` and triggers **non-blocking asynchronous pruning at `5.00 GiB`** (`~4.50 GiB` hysteresis recovery) via `VK_QUEUE_TRANSFER_BIT` and Vulkan 1.4 split barriers (`vkCmdSetEvent2` / `vkCmdWaitEvents2`), keeping VRAM safely below the `5.50 GiB` (`5.35 GiB` LSFG) hard ceiling with zero VBLANK stalls.
-* **Telemetry Smoke Check:** Launch `build_stage0\bin\eden.exe` and verify in Process Explorer and `build_stage_telemetry_metrics.json` that audio, graphics, guest CPU, and Core 5 reaper/pipeline threads pin to their designated P-cores with `"audio_underruns": 0`.
+* **Telemetry Smoke Check:** Launch `build_stage0\bin\eden.exe` and verify in Process Explorer and `build_stage_telemetry_metrics.json` that audio, graphics, guest CPU, and Core 5 reaper/pipeline threads pin to their designated P-cores with `"TelemetrySource": "SharedMemory" and "AudioUnderruns": 0`.
 
 ### 🚀 2.3 Profile-Guided Optimisation (PGO) Build & Training Protocol via Master Configurator Hub
 
@@ -198,7 +198,7 @@ channels = 2
 
 | Symptom | Root Cause | Immediate Fix |
 | :--- | :--- | :--- |
-| **Audio Clicks / `audio_underruns > 0`** | `bufferSizeSamples = 128` is too tight, or `storahci.sys` DPCs hitting Core 0. | 1) Run `Scripts\set_irq_affinity.ps1` as Admin and reboot; 2) Increase `bufferSizeSamples` to `192` or `256` in `FlexASIO.toml`. |
+| **Audio Clicks / `audio_underruns > 0`** | `bufferSizeSamples = 128` is too tight, or `storahci.sys` DPCs hitting Core 0. | 1) Run `%AX_TOOLS_DIR%\set_irq_affinity.ps1` as Admin and reboot; 2) Increase `bufferSizeSamples` to `192` or `256` in `FlexASIO.toml`. |
 | **Intel QSV Option Inactive** | Intel UHD 630 iGPU disabled in BIOS or DVMT aperture too small. | Enable *IGFX Multi-Monitor* in BIOS and set DVMT Pre-Allocated to 256 MB – 512 MB. |
 | **Stutter After 1–2 Hours** | Uncompressed RGBA8 ASTC textures exceeded GTX 980 Ti past its 5.50 GB VRAM ceiling. | Switch ASTC Recompression to BC3 (or BC7 in Phase 3) in per-game *Properties* → *Graphics*. |
 | **Flickering Geometry** | Non-contiguous DMA boundary or push-descriptor overflow in `vk_ubo_passthrough.cpp`. | Set `fast_ubo_passthrough = false` in per-game properties to verify. |
@@ -238,7 +238,7 @@ The unified root master hub (**`PGO_config.bat`**) orchestrates all pipeline sta
 | **Linker (`lld-link`)** | `undefined symbol: mainCRTStartup, memcpy, _chkstk` | `/NODEFAULTLIB:msvcrt.lib` stripped the `/MD` dynamic C runtime import library. | Keep `/NODEFAULTLIB:libcmt.lib` in `CMakeLists.txt` so `msvcrt.lib` and `ucrt.lib` link cleanly. |
 | **Linker (`lld-link`)** | `could not open 'nvcuvid.lib' or 'cuda.lib'` | Unused NVIDIA CUDA/NVDEC libraries listed in `PLATFORM_LIBRARIES`. | Remove `nvcuvid` and `cuda` from `CMakeLists.txt`; use Intel QSV (`mfplat`, `mfuuid`, `d3d11`, `dxgi`). |
 | **Win32 Macros** | `error: no member named 'CreateEventA'` | `<windows.h>` included without `NOMINMAX` or `#undef CreateEvent`. | Define `#define NOMINMAX` above `<windows.h>` and `#undef CreateEvent` immediately after. |
-| **PowerShell `Add-Type`** | `Parameter set cannot be resolved / Expected class, delegate, enum` | Conflicting `-Name` / `-Namespace` parameters passed alongside a self-contained C#-defined `namespace Win32` block. | Omit standalone `-Name` / `-Namespace` parameters in `Add-Type -TypeDefinition $w_code` when the C# snippet already declares its own namespace and class structure. |
+* **PowerShell `Add-Type`** | `Parameter set cannot be resolved / Expected class, delegate, enum` | Conflicting `-Name` / `-Namespace` parameters passed alongside `-TypeDefinition` when passing raw `[DllImport]` method signatures. | Use `-MemberDefinition $w_code -Name WWindowUtil -Namespace Win32` (as updated in `Scripts\PGO_stage*.bat`). |
 | **Source Hygiene** | `error: expected unqualified-id (at EOF of settings.cpp or qsv_decoder.cpp)` | Stray markdown code fence backticks appended from text export copy-pastes. | Open the affected C++ source file, scroll to the bottom, and remove any stray backticks or citation markers. |
 | **Compiler (`fmt 12.1`)** | `type_is_unformattable_for<EnumType, char>` | `fmt 12.1.0` requires explicit `fmt::underlying(...)` for scoped enums. | Wrap scoped enums in `fmt::underlying(val)` inside `LOG*` / `ASSERT_MSG` calls. |
 | **Compiler (`clang-cl`)** | `no matching function for call to '_bextr_u64'` | `_bextr_u64` requires 3 arguments on `clang-cl`. | Use `_bextr_u64(value, start, length)` in `src/common/bmi_util.h`. |
@@ -260,4 +260,4 @@ Getting `eden.exe` built, partitioned, and running is only the first step. The r
 * **Maxwell Throughput & BC7/BC6H Fidelity (Phases 2 & 3):** Deploying 32-bit Macro-JIT emitters, page-contiguity UBO streams, a 5.00 GiB proactive async VRAM shield, and near-lossless BC7 / BC6H texture compression.
 * **Heterogeneous Silicon & Closed-Loop Polish (Phases 4, 5 & 6):** Unlocking zero-copy WinRT WGC frame generation, asynchronous compute queues, predictive HDD-to-NVMe pre-faulting, the $< 300\text{ MB}$ `toram` Eden Piccolo [AX] USB appliance, and live background superblock re-compilation.
 
-*Thank you for being part of this build—now let's fire up `build_stage0\bin\eden.exe` and watch the silicon sing!*[cite: 13]
+*Thank you for being part of this build—now let's fire up `build_stage0\bin\eden.exe` and watch the silicon sing!*

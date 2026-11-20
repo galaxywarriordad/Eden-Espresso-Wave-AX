@@ -11,6 +11,9 @@ for %%i in ("%SCRIPT_DIR%..") do set "PROJ_DIR=%%~fi"
 if "%PROJ_DIR:~-1%"=="\" set "PROJ_DIR=%PROJ_DIR:~0,-1%"
 set "LLVM_PROJ_DIR=%PROJ_DIR:\=/%"
 
+call "%SCRIPT_DIR%resolve_ax_tools.bat"
+if !errorlevel! neq 0 exit /b 1
+
 set "VSCMD_ARG_TGT_ARCH=x64"
 set "TARGET_CPU_ARCH=Coffee Lake"
 set "TARGET_GPU_VENDOR=NVIDIA"
@@ -28,15 +31,15 @@ set "PATH=C:\Program Files\CMake\bin;C:\Program Files\LLVM\bin;C:\Program Files\
 set "QT_ENABLE_HIGHDPI_SCALING=1"
 set "QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough"
 
-set "BASE_GAME_DIR=J:\Switch"
-set "SSD_STAGING_DIR=E:\updates"
-if not exist "%BASE_GAME_DIR%" echo [@=FATAL] MECHANICAL TARGET DIRECTORY UNREACHABLE - DRIVE MOUNT MISSING. & exit /b 1
+if not defined BASE_GAME_DIR set "BASE_GAME_DIR=J:\Switch"
+if not defined SSD_STAGING_DIR set "SSD_STAGING_DIR=E:\updates"
+if not exist "%BASE_GAME_DIR%" echo [WARN] Mechanical archive directory (%BASE_GAME_DIR%) not mounted - continuing build.
 if not exist "%SSD_STAGING_DIR%" mkdir "%SSD_STAGING_DIR%" 2>nul
 
 cd /d "%PROJ_DIR%"
 
 echo [STATUS] Verifying hardware topology and macro configuration...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%check_hardware.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%AX_TOOLS_DIR%\check_hardware.ps1" -TargetApp eden -RepoRoot "%PROJ_DIR%"
 if !errorlevel! neq 0 exit /b !errorlevel!
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%macro_update.ps1"
@@ -79,30 +82,41 @@ if !errorlevel! neq 0 goto :ninja_fail
 if not exist "%BUILD_DIR%\bin\eden.exe" goto :ninja_fail
 
 echo [STATUS] Running post-build telemetry regression check...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%check_regression.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%AX_TOOLS_DIR%\check_regression.ps1" -RepoRoot "%PROJ_DIR%" -BaselineJson "%PROJ_DIR%\baseline_telemetry.json" -CurrentJson "%PROJ_DIR%\build_stage_telemetry_metrics.json"
 if !errorlevel! neq 0 goto :ninja_fail
 
 echo.
 echo [STATUS] Engine linkage successful. Running distributor provisioning checks...
-if not exist "%PROJ_DIR%\eden_engine.ini" (
-    echo [STATUS] Local template profile missing. Generating fallback eden_engine.ini configuration layout...
+if not exist "%PROJ_DIR%\ax_engine.ini" (
+    echo [STATUS] Local template profile missing. Generating fallback ax_engine.ini configuration layout...
     (
         echo [EngineTopology]
         echo EnableThreadAffinityMasks=true
         echo EnforceStrictCoreClamps=true
         echo MinCoresForIsolationSplit=6
+        echo EnableProportionalScaler=true
         echo CoreRatio=2:3:1
+        echo.
+        echo [HardwareFeatureFlags]
+        echo MaxwellSafeUBOPassthrough=auto
+        echo IntelQSVVideoOffload=auto
+        echo VramShieldPruneTriggerMB=5000
+        echo VramShieldCeilingMB=5500
+        echo VramShieldLsfgCeilingMB=5350
+        echo Bar1StagingCapMB=128
         echo.
         echo [WindowsPlatformHacks]
         echo EnableMMCSSProAudioScaling=true
         echo HostTimingPriorityClass=HIGH
         echo VulkanDriverPriorityClass=HIGH
         echo GuestExecutionPriorityClass=ABOVENORMAL
-    ) > "%PROJ_DIR%\eden_engine.ini"
+        echo AuxQuarantinePriorityClass=BELOWNORMAL
+    ) > "%PROJ_DIR%\ax_engine.ini"
 )
 
 echo [STATUS] Deploying configuration components downstream alongside binary targets...
-copy /Y "%PROJ_DIR%\eden_engine.ini" "%BUILD_DIR%\bin\eden_engine.ini" >nul
+copy /Y "%PROJ_DIR%\ax_engine.ini" "%BUILD_DIR%\bin\ax_engine.ini" >nul
+if exist "%PROJ_DIR%\eden_engine.ini" copy /Y "%PROJ_DIR%\eden_engine.ini" "%BUILD_DIR%\bin\eden_engine.ini" >nul
 if exist "%PROJ_DIR%\src\audio_core\FlexASIO.toml" (
     copy /Y "%PROJ_DIR%\src\audio_core\FlexASIO.toml" "%BUILD_DIR%\bin\FlexASIO.toml" >nul
     echo [STATUS] Pre-staged FlexASIO.toml deployment map finalized.

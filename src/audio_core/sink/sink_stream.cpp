@@ -6,6 +6,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <span>
 #include <vector>
@@ -19,6 +20,11 @@
 #include "common/settings.h"
 #include "core/core.h"
 #include "core/core_timing.h"
+
+#if __has_include(<ax/telemetry.hpp>)
+#include <ax/telemetry.hpp>
+#define EDEN_HAVE_AX_TELEMETRY 1
+#endif
 
 namespace AudioCore::Sink {
 
@@ -83,11 +89,6 @@ void SinkStream::AppendBuffer(SinkBuffer& buffer, std::span<s16> samples) {
 std::vector<s16> SinkStream::ReleaseBuffer(u64 num_samples) {
     auto samples{samples_buffer.Pop(num_samples)};
 
-    // TODO: Up-mix to 6 channels if the game expects it.
-    // For audio input this is unlikely to ever be the case though.
-
-    // Incoming mic volume seems to always be very quiet, so multiply by an additional 8 here.
-    // TODO: Play with this and find something that works better.
     constexpr s32 min = (std::numeric_limits<s16>::min)();
     constexpr s32 max = (std::numeric_limits<s16>::max)();
     auto volume{system_volume * device_volume * 8};
@@ -117,27 +118,19 @@ void SinkStream::ProcessAudioIn(std::span<const s16> input_buffer, std::size_t n
     const std::size_t frame_size_bytes = frame_size * sizeof(s16);
     size_t frames_written{0};
 
-    // If we're paused or going to shut down, we don't want to consume buffers as coretiming is
-    // paused and we'll desync, so just return.
     if (system.IsPaused() || system.IsShuttingDown())
         return;
 
     while (frames_written < num_frames) {
-        // If the playing buffer has been consumed or has no frames, we need a new one
         if (playing_buffer.consumed || playing_buffer.frames == 0) {
             if (!queue.TryPop(playing_buffer)) {
-                // If no buffer was available we've underrun, just push the samples and
-                // continue.
                 samples_buffer.Push(&input_buffer[frames_written * frame_size], (num_frames - frames_written) * frame_size);
                 frames_written = num_frames;
                 continue;
             }
-            // Successfully dequeued a new buffer.
             queued_buffers--;
         }
 
-        // Get the minimum frames available between the currently playing buffer, and the
-        // amount we have left to fill
         size_t frames_available{std::min<u64>(playing_buffer.frames - playing_buffer.frames_played, num_frames - frames_written)};
 
         samples_buffer.Push(&input_buffer[frames_written * frame_size], frames_available * frame_size);
@@ -145,17 +138,14 @@ void SinkStream::ProcessAudioIn(std::span<const s16> input_buffer, std::size_t n
         frames_written += frames_available;
         playing_buffer.frames_played += frames_available;
 
-        // If that's all the frames in the current buffer, add its samples and mark it as
-        // consumed
         if (playing_buffer.frames_played >= playing_buffer.frames)
             playing_buffer.consumed = true;
     }
 
     if (frames_written > 0) {
-        std::memcpy(&last_frame[0], &input_buffer[(frames_written - 1) * frame_size], frame_size_bytes);
+        std::memcpy(&last_frame, &input_buffer[(frames_written - 1) * frame_size], frame_size_bytes);
     }
 
-    // update sample counts fuer audio-ins
     {
         std::scoped_lock lk{sample_count_lock};
         last_sample_count_update_time = system.CoreTiming().GetGlobalTimeNs();
@@ -165,6 +155,11 @@ void SinkStream::ProcessAudioIn(std::span<const s16> input_buffer, std::size_t n
 }
 
 void SinkStream::ProcessAudioOutAndRender(std::span<s16> output_buffer, std::size_t num_frames) {
+#if defined(EDEN_HAVE_AX_TELEMETRY)
+    const auto cb_start = std::chrono::steady_clock::now();
+    bool had_underrun = false;
+#endif
+
     const std::size_t num_channels = GetDeviceChannels();
     const std::size_t frame_size = num_channels;
     const std::size_t frame_size_bytes = frame_size * sizeof(s16);
@@ -188,6 +183,9 @@ void SinkStream::ProcessAudioOutAndRender(std::span<s16> output_buffer, std::siz
 
             if (!queue.TryPop(playing_buffer)) {
                 lk.unlock();
+#if defined(EDEN_HAVE_AX_TELEMETRY)
+                had_underrun = true;
+#endif
                 for (size_t i = frames_written; i < num_frames; i++)
                     std::memcpy(&output_buffer[i * frame_size], last_frame.data(), frame_size_bytes);
                 frames_written = num_frames;
@@ -219,6 +217,19 @@ void SinkStream::ProcessAudioOutAndRender(std::span<s16> output_buffer, std::siz
         min_played_sample_count = max_played_sample_count;
         max_played_sample_count += actual_frames_written;
     }
+
+#if defined(EDEN_HAVE_AX_TELEMETRY)
+    auto& telemetry = ax::GetTelemetry();
+    telemetry.audio_buffer_switches.fetch_add(1, std::memory_order_relaxed);
+    if (had_underrun) {
+        telemetry.audio_underruns.fetch_add(1, std::memory_order_relaxed);
+    }
+    const auto cb_end = std::chrono::steady_clock::now();
+    const auto cb_us = static_cast<std::uint32_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(cb_end - cb_start).count()
+    );
+    ax::RecordAudioCallbackMetrics(cb_us, queued_buffers.load(std::memory_order_relaxed));
+#endif
 }
 
 u64 SinkStream::GetExpectedPlayedSampleCount() {
@@ -227,7 +238,6 @@ u64 SinkStream::GetExpectedPlayedSampleCount() {
     auto time_delta{cur_time - last_sample_count_update_time};
     auto exp_played_sample_count{min_played_sample_count + (TargetSampleRate * time_delta) / std::chrono::seconds{1}};
 
-    // Add 25ms of latency in sample reporting to allow for some leeway in scheduler timings
     return std::min<u64>(exp_played_sample_count, max_played_sample_count) + TargetSampleCount * 5;
 }
 

@@ -34,7 +34,7 @@ To achieve a zero-crackle audio output stream, your Windows desktop environment 
 
 - [ ] **Match System Sample Rate:** Open Windows Control Panel → Sound → Playback, select your primary USB DAC or audio interface endpoint, click *Properties* → *Advanced*, and force the default format strictly to **2 Channel, 24-bit or 32-bit, 48000 Hz (Studio Quality)** to sync 1:1 with the emulator's native 48 kHz engine clock.
 - [ ] **Authorize Exclusive Access:** In that same *Advanced* settings tab, check the box to **"Allow applications to take exclusive control of this device"** and **"Give exclusive applications priority"**. This permits FlexASIO to bypass the Windows `audiodg.exe` processing mixer.
-- [ ] **Verify Telemetry Output:** Launch a game, wait 60 seconds, check your `%APPDATA%\eden\log\eden_log.txt` or `build_stage_telemetry_metrics.json` cache file, and verify that `"audio_underruns"` remains locked at `0`.
+- [ ] **Verify Telemetry Output:** Launch a game, wait 60 seconds, check your `%APPDATA%\eden\log\eden_log.txt` or `build_stage_telemetry_metrics.json` cache file, and verify that `"AudioUnderruns"` remains locked at `0` (via live Local\AX_Telemetry shared memory).
 
 ---
 
@@ -63,7 +63,7 @@ When you launch a game with Eden Espresso Wave [AX], your hardware behaves compl
 
 We are immediately transitioning into our next optimization cycle. Here are the features gamers will see landing very soon:
 
-* **Automated One-Click Installer & Updater:** We are building a master configuration tool (`build_all.ps1`) and packager that will cleanly bundle the emulator, required link libraries, and optimized settings into a plug-and-play package.
+* **Automated One-Click Installer & Updater:** We are building a master configuration tool (`PGO_config.bat + ax-sdk/tools/`) and packager that will cleanly bundle the emulator, required link libraries, and optimized settings into a plug-and-play package.
 * **Next-Gen Texture Compression (`BC7` & `BC6H`):** We are adding support for modern, near-lossless compression. This will fix blocky textures and color "banding" in dark scenes without blowing past your graphics card's memory limits.
 * **The Bare-Metal Linux Plug-in:** For enthusiasts, we are launching an early version of our signature "USB Appliance". You will be able to flash the emulator onto a fast USB thumb drive, plug it into your PC, and boot directly into a highly stripped-down, ultra-fast gaming operating system that bypasses Windows entirely.
 

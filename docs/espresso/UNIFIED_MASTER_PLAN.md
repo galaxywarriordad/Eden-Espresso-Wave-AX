@@ -1,6 +1,6 @@
 # 🌐 Unified Dual-Target Master Plan (v1.4)
 
-**Updated:** `2026-11-19` (Post-`ax-sdk v1.35.0`, Proactive `5.00 GiB` Async VRAM Shield & Vulkan 1.4 Split-Barrier Sprint)
+**Updated:** `2026-11-20` (Post-`ax-sdk v1_36_1`, Shared-Memory Telemetry, Audio Jitter Profiler & Aggregated `tools/` Consolidation)
 
 This master plan consolidates **Eden Espresso Wave [AX]** (Windows 10/11 desktop build, `MASTER v1.35` → `v2.00`) and **Eden Piccolo [AX]** (Batocera Linux USB 3.0 appliance, `v0.6` → `v2.00`) into a single coordinated C++20 engineering programme powered by the shared MIT-licensed **`ax-sdk` (`ax::core`)** silicon runtime, while isolating OS-specific drivers and video/audio handles behind `#ifdef _WIN32` and `#ifdef __linux__` shims.
 
@@ -35,10 +35,10 @@ Both **Eden Espresso Wave [AX]** (Windows 10) and **Eden Piccolo [AX]** (Batocer
 | :--- | :--- | :--- |
 | **Virtual Memory & BMI1 Translation** | `device_memory.h/.cpp`, `bmi_util.h`, `memory.h/.cpp`, `device_memory_manager.h/.cpp` | Reserves a 512 GB contiguous guest virtual address space (`1ULL << 39`); performs single-cycle page extraction via 3-arg BMI1 `_bextr_u64(vaddr, YUZU_PAGEBITS, 36)`; uses split $O(1)$ vs. `MULTI_FLAG` GMMU resolution and incorporates **Eden PR #3817** (`HeapTracker` leak removal). |
 | **Lock-Free Dirty Memory Tracking** | `gpu_dirty_memory_manager.h/.cpp` | Tracks dirty pages on guest threads via 8-byte `TransformAddress` weak-CAS (`compare_exchange_weak`); executes zero-copy `front_buffer.swap(back_buffer)` and `TZCNT`/`BLSR` bit-scans inside `Gather()` on Core 1 (`0x02`). |
-| **Dynamic `2:3:1` Topology & Fiber Timeline** | `ax-sdk/src/topology.cpp`, `cpu_manager.h/.cpp`, `core_timing.h/.cpp`, `eden_engine.ini` | Enumerates physical P-cores via `GetLogicalProcessorInformationEx` (`LTP_PC_SMT` + `EfficiencyClass`) and Linux `sysfs` (`thread_siblings_list` + `cpu_capacity`), enforcing `CoreRatio=2:3:1` (`0x01`/`0x02`/`0x1C`/`0x20` on `i5-9600K`) and `HostTimingPriorityClass=HIGH` + MMCSS `Pro Audio` (with RAII `AvRevertMmThreadCharacteristics` cleanup); drives `CoreTiming` via an $O(1)$ Boost Fibonacci Heap protected by `std::scoped_lock{advance_lock, basic_lock}`. |
+| **Dynamic `2:3:1` Topology & Unified Settings** | `ax-sdk/src/{topology,config}.cpp`, `cpu_manager.h/.cpp`, `core_timing.h/.cpp`, `ax_engine.ini` | Enumerates physical P-cores via `GetLogicalProcessorInformationEx` (`LTP_PC_SMT` + `EfficiencyClass`) and Linux `sysfs` (`thread_siblings_list` + `cpu_capacity`), loading `CoreRatio=2:3:1` (`0x01`/`0x02`/`0x1C`/`0x20` on `i5-9600K`) from `ax_engine.ini` (`ax::LoadEngineConfig()`) and `HostTimingPriorityClass=HIGH` + MMCSS `Pro Audio` (with RAII `AvRevertMmThreadCharacteristics` cleanup); drives `CoreTiming` via an $O(1)$ Boost Fibonacci Heap protected by `std::scoped_lock{advance_lock, basic_lock}`. |
 | **Zero-Heap Audio DSP & Batch SPSC Ring** | `ax-sdk/include/ax/audio.hpp`, `lockfree_audio_queue.hpp`, `system_manager.h/.cpp` | Runs an inline `std::optional` `AudioManager` and ADSP microkernel backed by `ax-sdk`'s 64-byte cache-line-isolated `LockFreeStereoRing<2048, float>` (`PushBatch`, `PopBatch`, `PopPlanarBatch` for Steinberg ASIO Left/Right de-interleave) with contiguous `std::memcpy` transfers and per-callback telemetry accounting; uses `libswresample` AVX2 FIR (`SWR_DITHER_TRIANGULAR_HIGHPASS`) as a software micro-pitch PLL ($\pm 0.005\%$) plus **Eden PR #2** biquad bounds checks. |
 | **Maxwell GM200 Vulkan, Sparse VMA & Shader Safety** | `macro_jit_compiler.cpp`, `vk_ubo_passthrough.cpp`, `vk_texture_cache.cpp`, `texture_cache.h`, `emit_spirv.cpp`, `texture_reaper.cpp` | Emits 64B-aligned, 32-bit sign-extended Xbyak GPU Macro-JIT code; enforces page-contiguity UBO passthrough and `maxPushDescriptors` clamps (**Citron PR #4688, #449, #383**), procedural draw fastpaths (**#448**), subresource clamps (**#385, #447**), and `128 MiB` / `16 MiB` / 128-slice unswizzle limits; backs dynamic render targets with a 64 KB Sparse Page-Aliased VMA pool (`VK_KHR_bind_memory2`) to eliminate mid-game `vkAllocateMemory` stalls; supports `BC3`/`BC7`/`BC6H` plus Option C `< 4.5 GB` `RGBA8`, `emit_spirv.cpp` `lmem` register-spill condensation, uniform `#version 460 core` + `GL_GOOGLE_include_directive` shader headers, and **Eden PR #32** CPU-delta overlap invalidation. |
-| **Quarantine Workers, Loading Burst & Telemetry** | `ncz_decompressor.cpp`, `vk_pipeline_worker.h/.cpp`, `vk_cache_decompression.cpp`, `perf_stats.h/.cpp` | Quarantines background tasks onto Core 5 (`0x20`) via `ScopedNczQuarantine`, with loading-screen core bursting across `0x1C` before guest fibers spin up for $3\times$ faster `.ncz` extraction; enforces `ASYNC_WORKER_CORE_CLAMP = 1`, 32B-aligned AVX2 non-temporal cache decompression (`_mm256_stream_si256` + `_MM_HINT_NTA`), and `FFmpeg::execute2` slice routing; exports lock-free `g_metrics` atomic counters consumed by `telemetry_daemon.ps1`. |
+| **Quarantine Workers, Loading Burst & SHM Telemetry** | `ax-sdk/src/telemetry.cpp`, `ncz_decompressor.cpp`, `vk_pipeline_worker.h/.cpp`, `vk_cache_decompression.cpp`, `sink_stream.cpp` | Quarantines background tasks onto Core 5 (`0x20`) via `ScopedNczQuarantine`, with loading-screen core bursting across `0x1C` before guest fibers spin up for $3\times$ faster `.ncz` extraction; enforces `ASYNC_WORKER_CORE_CLAMP = 1`, 32B-aligned AVX2 non-temporal cache decompression (`_mm256_stream_si256` + `_MM_HINT_NTA`), and `FFmpeg::execute2` slice routing; publishes 64B-padded atomic counters (`Local\AX_Telemetry` / `/dev/shm/ax_telemetry`) and microsecond audio callback jitter histograms (`ax::RecordAudioCallbackMetrics`) consumed by `ax-sdk/tools/track_telemetry.ps1`. |
 
 ## 🔀 1.3 Platform Shim Abstraction Matrix
 
@@ -87,15 +87,19 @@ Both **Eden Espresso Wave [AX]** (Windows 10) and **Eden Piccolo [AX]** (Batocer
 Both **Eden Espresso Wave [AX]** (Windows 10) and **Eden Piccolo [AX]** (Batocera Linux USB Appliance) build from one unified C++20 repository (`Eden4CoffeeLake` / `Eden-Espresso-Wave-AX`):
 
 ```text
-ax-sdk/                                 # Shared MIT-licensed C++20 silicon core (FetchContent / Buildroot)
-├── CMakeLists.txt                      # Exports ax::core & ax::sdk (winmm/avrt/psapi on Win32; pthread/dl on Linux)
+ax-sdk/                                 # Shared MIT-licensed C++20 silicon core & host tools (v1_36_1)
+├── CMakeLists.txt                      # Exports ax::core & ax::sdk (cxx_std_20 target-scoped)
+├── config/hardware_profiles.json       # Declarative silicon matrix (schema_version: 2.1)
 ├── include/ax/
+│   ├── config.hpp                      # Platform/ISA macros & unified ax_engine.ini parser
+│   ├── telemetry.hpp                   # 64B-padded SHM counters & min/P99/max audio jitter stats
 │   ├── vram.hpp                        # 5.00 GiB proactive prune watermark (kPruneTriggerBytes) + hysteresis
 │   ├── topology.hpp                    # AudioTiming, VulkanSubmission, GuestJit, Housekeeping domains
 │   ├── audio.hpp                       # 64B cache-line-padded LockFreeStereoRing (memcpy + PopPlanar)
 │   ├── memory.hpp                      # 1G/2M HugeTLB & BMI1 _bextr_u64 helpers
 │   └── igpu.hpp                        # Intel UHD 630 bandwidth & DMA-BUF modifier guardrails
-└── src/topology.cpp                    # Win32 GetLogicalProcessorInformationEx + Linux sysfs 2:3:1 P-core scaler
+├── src/                                # config.cpp, telemetry.cpp, topology.cpp, memory.cpp
+└── tools/                              # Get-AxProfile, check_hardware, set_irq_affinity (-Revert), track_telemetry, check_regression, clean_all (-Wait), ax_doctor.sh
 
 Eden-Espresso-Wave-AX/
 ├── .gitattributes                      # Enforces CRLF on *.bat/*.ps1; LF on C++/MD/Shell/Buildroot files
@@ -104,7 +108,7 @@ Eden-Espresso-Wave-AX/
 ├── UNIFIED_MASTER_PLAN.md              # Dual-Target Convergence Master Plan (v1.4)
 ├── BACKLOG.md                          # Cross-Synced Engineering Backlog (v1.35 -> v2.00)
 ├── WhatsNext.md                        # Active Rolling Sprint Plan (v1.35)
-├── eden_engine.ini                     # Runtime CoreRatio=2:3:1, HostTimingPriorityClass=HIGH & hardware flags
+├── ax_engine.ini                       # Unified [AX] CoreRatio=2:3:1, HostTimingPriorityClass=HIGH & telemetry flags
 ├── externals/CMakeLists.txt            # FetchContent ax_sdk (cross-host) + WIN32-gated asio_sdk & FlexASIO
 ├── PGO_config.bat                      # Interactive build configurator, IRQ auditor & PGO stage launcher
 ├── src/
@@ -126,18 +130,19 @@ Eden-Espresso-Wave-AX/
 │   └── shader_recompiler/
 │       └── backend/spirv/
 │           └── emit_spirv.cpp          # [SHARED] Maxwell GM200 lmem register-spill condensation
-├── Scripts/                            # Consolidated Windows automation & telemetry tooling:
-│   ├── PGO_stage0.bat                  # Stage 0 high velocity build
-│   ├── PGO_stage0LD.bat                # Stage 0 build + macro_update + shader_validate + telemetry gate
-│   ├── PGO_stage1.bat                  # Stage 1 PGO instrumented build + automated quality gates
-│   ├── PGO_stage2.bat                  # Stage 2 PGO L1i production bake + automated quality gates
-│   ├── check_hardware.ps1              # Pre-flight hardware, privilege & IRQ readiness check
-│   ├── set_irq_affinity.ps1            # Registry MSI IRQ affinity enforcement (0x01 / 0x02 / 0x20)
-│   ├── irq_runtime_helper.ps1          # Reversible runtime MSI IRQ assignment helper
+├── Scripts/                            # Switch/Eden adapter scripts (shared host tools resolved via ax-sdk/tools/):
+│   ├── resolve_ax_tools.bat            # Locates %AX_TOOLS_DIR% across AX_SDK_DIR, ../ax-sdk, or FetchContent
+│   ├── PGO_stage0.bat                  # Stage 0 high-velocity incremental build
+│   ├── PGO_stage0I.bat                 # Stage 0I ~15s Ninja delta rebuild
+│   ├── PGO_stage0LD.bat                # Stage 0LD clean diagnostics build + quality gates
+│   ├── PGO_stage1.bat                  # Stage 1 PGO instrumented build + SHM telemetry gate
+│   ├── PGO_stage2.bat                  # Stage 2 PGO L1i production bake + regression gate
 │   ├── macro_update.ps1                # Numeric shader macro harmonizer (USE_EASU, USE_RCAS, FP16, VERSION)
-│   ├── validate_profile.ps1            # Pre-build GLSL 460 / SPIR-V validation via glslangValidator
-│   └── track_telemetry.ps1             # Async per-core eden.exe profiler & JSON regression reporter
-├── scripts/linux/                      # test_nv12_dmabuf.c, verify_ax_appliance.sh, fetch_piccolo_sources.sh
+│   ├── shader_validate.ps1             # Pre-build GLSL 460 / SPIR-V validation via glslangValidator
+│   ├── validate_profile.ps1            # LLVM .profraw counter & symbol binding validator
+│   ├── reset_eden_config.ps1           # Deterministic qt-config.ini enforcer via Get-AxProfile.ps1
+│   └── tail_eden_log.ps1               # [TL] single-window unelevated runtime triage filter
+├── scripts/linux/                      # test_nv12_dmabuf.c, ax_doctor.sh + verify_ax_appliance.sh, fetch_piccolo_sources.sh
 └── batocera-ax-external/               # Out-of-tree Batocera Buildroot overlay (Piccolo [AX])
     ├── external.desc
     ├── external.mk
@@ -200,7 +205,7 @@ Eden-Espresso-Wave-AX/
 | **ISA & Intrinsics** | `/clang:-march=skylake /clang:-mavx2 /clang:-mfma /clang:-mbmi /clang:-mbmi2` | `-march=skylake -mavx2 -mfma -mbmi -mbmi2 -O3` | Unlocks single-cycle 3-arg `_bextr_u64` (BMI1), `TZCNT`/`BLSR` (BMI1), & AVX2 FIR/non-temporal stores (`_MM_HINT_NTA`). |
 | **LTO Mode** | `-flto=thin` | `-flto=thin -fuse-ld=lld` | Enables cross-module inlining across `CoreTiming`, `AudioCore`, `VulkanWorker`, & `Dynarmic`. |
 | **Pre-Build Shader Gate** | `macro_update.ps1` (`USE_EASU`, `USE_RCAS`, `YUZU_USE_FP16`, `VERSION`) + `shader_validate.ps1` (`glslangValidator`) | Build-time GLSL 460 core & `GL_GOOGLE_include_directive` header check | Prevents Vulkan SPIR-V preprocessor token conflicts and catches shader syntax errors before C++ compilation. |
-| **PGO Stage 1 (Collect)** | `-fprofile-instr-generate` → writes `default.profraw` on NVMe #1; profiled via `telemetry_daemon.ps1` | `BR2_PACKAGE_EDEN_PGO_STAGE=1` (`-fprofile-instr-generate`) → writes `.profraw` to `EdenCache` `tmpfs` (zero USB flash wear) | Instruments hot branch edges during $3 \times 15\text{ min}$ representative gameplay sweeps while verifying core/memory telemetry. |
+| **PGO Stage 1 (Collect)** | `-fprofile-instr-generate` → writes `default.profraw` on NVMe #1; profiled via `track_telemetry.ps1` | `BR2_PACKAGE_EDEN_PGO_STAGE=1` (`-fprofile-instr-generate`) → writes `.profraw` to `EdenCache` `tmpfs` (zero USB flash wear) | Instruments hot branch edges during $3 \times 15\text{ min}$ representative gameplay sweeps while verifying core/memory telemetry. |
 | **PGO Merge Tool** | `llvm-profdata merge -output=eden.profdata *.profraw` | `llvm-profdata-23 merge -output=eden.profdata *.profraw` | Produces portable LLVM indexed profile data. |
 | **PGO Stage 2 (Bake)** | `-fprofile-instr-use=eden.profdata` → `eden.exe` + automated telemetry regression check | `BR2_PACKAGE_EDEN_PGO_STAGE=2` (`-fprofile-use=eden.profdata`) → `rootfs.erofs` (`< 300 MB`) | Linearises hot basic blocks inside Skylake's 32 KB L1i cache. |
 
@@ -235,13 +240,13 @@ Eden-Espresso-Wave-AX/
   * **Verify USB controller isolation:** Inspect `lspci -nn | grep -i usb` (Linux) and Device Manager (Windows) to confirm that the HiBy FC3 DAC and Samsung FIT Plus 64 GB reside on independent xHCI PCIe root hubs.
   * **Intel CAT (`resctrl`) Silicon MSR Check:** Test `rdmsr 0xc8f` on bare metal. Because desktop Coffee Lake CPUs typically fuse off CAT MSRs in hardware, confirm status early and engage `_mm_prefetch(..., _MM_HINT_NTA)` non-temporal streaming reads on Core 5 (`0x20`) as the zero-overhead software L3 protection path.
 * **Windows (Espresso Wave [AX]) Track:**
-  * *(Completed Tooling)* Automated `macro_update.ps1`, `shader_validate.ps1`, `telemetry_daemon.ps1`, and live IRQ affinity audit display inside the root configurator menu, integrated across `PGO_stage0LD.bat`, `PGO_stage1.bat`, and `PGO_stage2.bat`.
-  * *(Active Execution)* Compile `PGO_stage0` binary via `PGO_stage0LD.bat`, run Stage 0 regression triage with `telemetry_daemon.ps1`, and confirm `Scripts\check_hardware.ps1` (`SeLockMemoryPrivilege`, `0x01`/`0x02`/`0x20` IRQ masks, and `128`-sample / `2.67 ms` FlexASIO exclusive output).
+  * *(Completed Tooling)* Automated `macro_update.ps1`, `shader_validate.ps1`, `track_telemetry.ps1`, and live IRQ affinity audit display inside the root configurator menu, integrated across `PGO_stage0LD.bat`, `PGO_stage1.bat`, and `PGO_stage2.bat`.
+  * *(Active Execution)* Compile `PGO_stage0` binary via `PGO_stage0LD.bat`, run Stage 0 regression triage with `track_telemetry.ps1`, and confirm `%AX_TOOLS_DIR%\check_hardware.ps1` (`SeLockMemoryPrivilege`, `0x01`/`0x02`/`0x20` IRQ masks, and `128`-sample / `2.67 ms` FlexASIO exclusive output).
 * **Linux (Piccolo [AX]) Track (Temporary Ubuntu/Arch Live USB Bench):**
   * Boot mainline Linux 6.12.x LTS (`CONFIG_PREEMPT_RT=y` and `CONFIG_DRM_TTM_HELPER=y`) with the hard-pinned NVIDIA `580.*` legacy driver (`IGNORE_PREEMPT_RT_PRESENCE=1`) and persistence mode enabled (`nvidia-smi -pm 1`, P0 boost state).
   * Compile and run standalone `test_nv12_dmabuf.c` (`VkImageDrmFormatModifierListCreateInfoEXT`) to prove zero-copy `DRM_FORMAT_MOD_LINEAR` NV12 surface handoff from Intel UHD 630 (`iHD` VA-API) into GTX 980 Ti Vulkan.
   * Execute a 60-second `speaker-test` on `hw:CARD=FC3,DEV=0` (`S32_LE`, 48 kHz, `nrpacks=1`) and confirm `0` xruns.
-* **Mandatory Exit Gate:** Both Windows `Scripts\check_hardware.ps1` + Stage 0 regression triage and Linux `test_nv12_dmabuf.c` + 0-xrun ALSA checks pass on bare metal.
+* **Mandatory Exit Gate:** Both Windows `%AX_TOOLS_DIR%\check_hardware.ps1` + Stage 0 regression triage and Linux `test_nv12_dmabuf.c` + 0-xrun ALSA checks pass on bare metal.
 
 ### 🧱 Sprint 1: Core Partitioning, Shim Foundation & First Bootable USB MVP
 
@@ -253,7 +258,7 @@ Eden-Espresso-Wave-AX/
   * Quarantine background workers to Core 5 (`0x20`) via `ScopedNczQuarantine`—adding loading-screen core bursting across `0x1C` before guest fibers spin up for $\sim 3\times$ faster `.ncz` extraction.
   * Enforce `ASYNC_WORKER_CORE_CLAMP = 1`, `FFmpeg::execute2` slice routing, uniform `#version 460 core` + `#extension GL_GOOGLE_include_directive` shader headers, and Eden PRs `#4819`, `#4210`, `#4664`, `#2`, and `#3817` (`HeapTracker` leak removal).
 * **Windows (Espresso Wave [AX]) Track:**
-  * Verify `clang-cl 23+` (`-march=skylake`, ThinLTO) build stability and Vulkan 1.4 dynamic dispatch compliance (`VK_NO_PROTOTYPES`) on `v1.34`, and harden `telemetry_daemon.ps1` with ASIO underrun and voice drop counters.
+  * Verify `clang-cl 23+` (`-march=skylake`, ThinLTO) build stability and Vulkan 1.4 dynamic dispatch compliance (`VK_NO_PROTOTYPES`) on `v1.34`, and harden `track_telemetry.ps1` with ASIO underrun and voice drop counters.
 * **Linux (Piccolo [AX]) Track:**
   * **Buildroot & Size Gate:** Scaffold `batocera-ax-external/` using a split toolchain (GCC for base OS packages; Clang 23+ for `eden`), strip excluded packages (PipeWire, PulseAudio, Openbox, CUDA/OptiX/NVENC, Mesa LLVM/Gallium), and enforce the `< 300 MB` `post-image.sh` size assertion.
   * **Storage & Boot:** Partition the Samsung FIT Plus 64 GB drive (`4.0 GB` FAT32 `BATOCERA` + `~55.6 GB` `^has_journal` ext4 `SHARE`) and implement `initrd` `dd bs=4M` `toram` EROFS (`lz4hc,9`) boot with `mitigations=off` in `grub.cfg` (eliminating 8–18% Spectre/Meltdown/Retbleed syscall overhead on this offline appliance).
@@ -271,7 +276,7 @@ Eden-Espresso-Wave-AX/
   * Port the 64B-aligned, 32-bit sign-extended Xbyak GPU Macro-JIT (`macro_jit_compiler.cpp`), page-contiguity UBO passthrough, and `maxPushDescriptors` clamps (Citron PRs `#4688`, `#449`, `#383`).
   * Integrate procedural draw fastpaths (`#448`), subresource range clamping (`#385`, `#447`), and `libswresample` AVX2 FIR resampling (`SWR_DITHER_TRIANGULAR_HIGHPASS`) configured as a software micro-pitch PLL ($\pm 0.005\%$) driven by `lockfree_audio_queue.hpp` fill watermarks to absorb Z390-to-DAC crystal drift.
 * **Windows (Espresso Wave [AX]) Track:**
-  * Validate Xbyak Macro-JIT, page-contiguity UBO passthrough, and the config-driven 2:3:1 physical-core scaler (`eden_engine.ini`) across `SwitchHDD` and NVMe #2 titles with zero `VK_ERROR_DEVICE_LOST` faults.
+  * Validate Xbyak Macro-JIT, page-contiguity UBO passthrough, and the config-driven 2:3:1 physical-core scaler (`ax_engine.ini`) across `SwitchHDD` and NVMe #2 titles with zero `VK_ERROR_DEVICE_LOST` faults.
 * **Linux (Piccolo [AX]) Track:**
   * **1G/2M Hybrid HugePages:** Upgrade GRUB to hybrid `6.0 GB` (1G) + `2.0 GB` (2M) HugePages (`8.0 GB` HugeTLB) with a `5.0 GB` Host Safety Floor, mapping `Core::DeviceMemory` (512 GB fastmem) and the Dynarmic JIT cache onto `MAP_HUGE_1GB`.
   * **Tickless Core 0 Fusion:** Fuse `CoreTiming`, `AudioCore`, and `SCHED_FIFO 99` ALSA (`S32_LE`, 96 frames × 2 = `2.00 ms`, with 128-frame auto-fallback) into a single runnable thread on Core 0 (symmetrically locked at `4.8 GHz`, `max_cstate=0`) so Linux `nohz_full` remains 100% tickless.
@@ -313,9 +318,9 @@ Eden-Espresso-Wave-AX/
   * Implement the closed-loop adaptive governor using lock-free `g_metrics` atomic counters to dynamically tune `SpeedLimiter` `_mm_pause()` spin tails (`0.4–1.5 ms`) and protect Core 0 audio headroom.
   * Export lock-free telemetry (`/dev/shm` and Windows shared memory) for the optional 3.5" USB serial dev-kit display.
 * **Windows (Espresso Wave [AX]) Track:**
-  * Run the Pre-PGO sanitizer verification pass, execute `PGO_stage1.bat` across $3 \times 15\text{ min}$ gameplay sweeps (with `macro_update.ps1`, `shader_validate.ps1`, and `telemetry_daemon.ps1` active), pass `Scripts\validate_profile.ps1`, merge profiles with `llvm-profdata`, and build the `clang-cl 23+` Stage 2 production `eden.exe` binary (`PGO_stage2.bat`).
+  * Run the Pre-PGO sanitizer verification pass, execute `PGO_stage1.bat` across $3 \times 15\text{ min}$ gameplay sweeps (with `macro_update.ps1`, `shader_validate.ps1`, and `track_telemetry.ps1` active), pass `Scripts\validate_profile.ps1`, merge profiles with `llvm-profdata`, and build the `clang-cl 23+` Stage 2 production `eden.exe` binary (`PGO_stage2.bat`).
 * **Linux (Piccolo [AX]) Track:**
-  * Run `BR2_PACKAGE_EDEN_PGO_STAGE=1` sweeps writing `.profraw` traces strictly into `EdenCache` `tmpfs` (zero USB flash wear), merge `eden.profdata`, bake the `STAGE=2` immutable `rootfs.erofs` image (`< 300 MB`) alongside A/B fallback slot `rootfs.erofs.prev`, and pass `verify_ax_appliance.sh --runtime` (`EXCELLENT_APPLIANCE_READY`).
+  * Run `BR2_PACKAGE_EDEN_PGO_STAGE=1` sweeps writing `.profraw` traces strictly into `EdenCache` `tmpfs` (zero USB flash wear), merge `eden.profdata`, bake the `STAGE=2` immutable `rootfs.erofs` image (`< 300 MB`) alongside A/B fallback slot `rootfs.erofs.prev`, and pass `ax_doctor.sh + verify_ax_appliance.sh --runtime` (`EXCELLENT_APPLIANCE_READY`).
 * **Mandatory Exit Gate:** Both platforms pass all automated telemetry assertions (`0` audio underruns, `0` mid-game USB writes on Piccolo, `<= 5.35 GB` VRAM, and `< 300 MB` EROFS image) with PGO-linearised L1i binaries.
 
 ### 🔬 Sprint 6: Autonomous Silicon & Hardware Phase-Sync R&D (`v2.00` Unified Parity)
@@ -333,10 +338,10 @@ Eden-Espresso-Wave-AX/
 
 ## 🔍 4.1 Unified Hardware, Kernel & Driver Quality Gate (Pre-Launch Assertions)
 
-| Audit Domain | Acceptance Threshold (Pass Criteria) | Windows Assertion (`Scripts\check_hardware.ps1` & Pre-Build Gates) | Linux Appliance Assertion (`verify_ax_appliance.sh`) |
+| Audit Domain | Acceptance Threshold (Pass Criteria) | Windows Assertion (`%AX_TOOLS_DIR%\check_hardware.ps1` & Pre-Build Gates) | Linux Appliance Assertion (`verify_ax_appliance.sh`) |
 | :--- | :--- | :--- | :--- |
 | **CPU Clocks, C-States & Mitigations** | Cores 0–5 locked symmetrically at `4.8 GHz` (`x48`), Uncore Ring at `4.5 GHz` (`x45`), zero SMT, deep C-states disabled, `mitigations=off` on appliance | `Get-CimInstance Win32_Processor` (`NumberOfCores=6`, `NumberOfLogicalProcessors=6`) + Power Plan High Performance (`0%` idle throttle) | `/proc/cpuinfo` `cpu MHz >= 4790` on Cores 0–5; `cpuidle/current_driver = none` (`processor.max_cstate=0`); `/sys/devices/system/cpu/vulnerabilities/*` confirms `mitigations=off`. |
-| **Core Isolation & Tickless Mode** | Cores 0–4 shielded from background OS tasks/IRQs; Core 5 (`0x20`) absorbs all housekeeping with `_MM_HINT_NTA` reads | `Scripts\set_irq_affinity.ps1` registry audit (`0x01` DAC, `0x02` GTX 980 Ti, `0x20` NVMe/SATA) + live root menu IRQ display | `/sys/fs/cgroup/isolated/cpuset.cpus.partition = isolated`; `/sys/devices/virtual/workqueue/cpumask = 20`; `0` unexpected `LOC` ticks on Cores 0–4 in `/proc/interrupts`. |
+| **Core Isolation & Tickless Mode** | Cores 0–4 shielded from background OS tasks/IRQs; Core 5 (`0x20`) absorbs all housekeeping with `_MM_HINT_NTA` reads | `%AX_TOOLS_DIR%\set_irq_affinity.ps1` registry audit (`0x01` DAC, `0x02` GTX 980 Ti, `0x20` NVMe/SATA) + live root menu IRQ display | `/sys/fs/cgroup/isolated/cpuset.cpus.partition = isolated`; `/sys/devices/virtual/workqueue/cpumask = 20`; `0` unexpected `LOC` ticks on Cores 0–4 in `/proc/interrupts`. |
 | **Shader Macro & SPIR-V Hygiene** | Uniform `#version 460 core`, explicit numeric shader macros (`USE_EASU`, `USE_RCAS`, `YUZU_USE_FP16`, `VERSION`), zero SPIR-V validation errors | `Scripts\macro_update.ps1` + `Scripts\shader_validate.ps1` (`glslangValidator`) pass with exit code `0` inside PGO stage scripts | Build-time GLSL 460 core & `GL_GOOGLE_include_directive` validation pass with zero SPIR-V errors. |
 | **Large / HugePage Reservation** | `8.0 GB` HugeTLB locked (`6.0 GB` 1G + `2.0 GB` 2M on Linux; `SeLockMemoryPrivilege` on Win32); Host Safety Floor `>= 5.0 GB` | `whoami /priv` confirms `SeLockMemoryPrivilege = Enabled`; free physical RAM `>= 22 GB` | `/proc/meminfo` confirms `HugePages_Total: 6` (`1048576 kB`) + `1024` (`2048 kB`); `zram0 = 512M` (`vm.swappiness=1`). |
 | **dGPU Driver & PCIe Link** | GTX 980 Ti (`01:00.0`) on PCIe x16 Gen 3, P0 persistence active, ASPM disabled, legacy Maxwell branch locked, `GLCache` persisted | `nvidia-smi` confirms PCIe Gen 3 x16, P0 state, `580.*` branch, `__GL_YIELD=NOTHING` | `nvidia-smi` confirms `580.*` legacy driver + `Persistence-M = On`; `0000:01:00.0/power/control = on`; `__GL_SHADER_DISK_CACHE_PATH=/dev/shm/nv_cache`. |
@@ -363,7 +368,7 @@ Eden-Espresso-Wave-AX/
 
 1. **Dual-Target Build, Shader Gate & Pre-PGO Sanitizer Check:** Both `clang-cl 23+` (Windows) and `clang-23` + `lld-23` (`batocera-ax-external/`) compile with zero errors and zero `-Werror` warnings, `macro_update.ps1` + `shader_validate.ps1` pass with zero SPIR-V diagnostics, and `ldd` confirms zero forbidden library dependencies. Execute a Debug sanitizer pass (`-fsanitize=address,undefined` and `-fsanitize=thread`) across `lockfree_audio_queue.hpp`, `gpu_dirty_memory_manager.cpp`, and `vaapi_dmabuf_bridge.hpp` prior to Stage 1 PGO sweeps.
 2. **Appliance Footprint & A/B Rollback Gate (Piccolo [AX]):** `post-image.sh` confirms `rootfs.erofs` (`lz4hc,9`) `<= 307,200 KB` (`300 MB`), `toram` boot copy `< 1.0s`, and `/boot/boot/rootfs.erofs.prev` A/B fallback slot present in `grub.cfg`.
-3. **Hardware & Telemetry Gate:** `Scripts\check_hardware.ps1` + `telemetry_daemon.ps1` JSON regression checks and `verify_ax_appliance.sh` output `EXCELLENT_APPLIANCE_READY` with `0` audio underruns, `0` unexpected `LOC` timer interrupts on Cores 0–4, `mitigations=off` confirmed on Piccolo, and peak VRAM strictly within budget.
+3. **Hardware & Telemetry Gate:** `Scripts\check_hardware.ps1` + `telemetry_daemon.ps1` JSON regression checks and `ax_doctor.sh + verify_ax_appliance.sh` output `EXCELLENT_APPLIANCE_READY` with `0` audio underruns, `0` unexpected `LOC` timer interrupts on Cores 0–4, `mitigations=off` confirmed on Piccolo, and peak VRAM strictly within budget.
 4. **Persistence & Recovery Gate:** Exiting a title via the controller combo (`Select+Start` 1.5s hold) cleanly terminates `io_uring`/`vmtouch`, atomically writes `.tar.zst` (`zstd -3` covering `EdenCache` + `/dev/shm/nv_cache`), resumes EmulationStation (`SIGCONT < 50 ms`), and passes `e2fsck -n` on `SHARE` after reboot.
 
 ---
@@ -403,4 +408,4 @@ Eden-Espresso-Wave-AX/
 | **3. Live Background Superblock Re-Compilation (`live_reopt_daemon.cpp`)** | Stream lightweight guest branch-edge counters from Cores 2–4 over a lock-free ring to a low-priority LLVM JIT worker on Core 5 (`0x20`) that compiles unrolled AVX2 superblocks and atomically swaps Dynarmic jump-table pointers between frames. | Cuts CPU-bound frame times by 8–15% in complex simulation loops without mid-frame compilation stalls. |
 | **4. Shared Zstandard Dictionary Compression for `EdenCache` Archives** | Train a static 256 KB `zstd` dictionary (`zstd --train`) across representative Switch SPIR-V/Maxwell shader caches and bake it into `rootfs.erofs`, invoking `zstd -3 -D /etc/piccolo/shader.dict` in `K01piccolo-sync` and `edenGenerator.py`. | Improves shader cache compression ratio by 25–35% and accelerates exit `.tar.zst` USB writes and launch decompression. |
 | **5. Outer-Cylinder Physical Platter Alignment on `SwitchHDD`** | Partition `SwitchHDD` (7200 RPM mechanical drive) with a dedicated outer-cylinder `~250 GB` primary partition (`SwitchHOT`) for active v0 titles and updates, where linear platter velocity peaks at `~190–210 MB/s` (vs. `~95 MB/s` on inner tracks). | Cuts initial `17.5 GB` cold-load times nearly in half (`~180s` → `~90s`) with zero hardware cost. |
-| **6. Hardware VBLANK & HiBy FC3 Clock Phase-Sync Dongle (RP2040 / ESP32-S3)** | Deploy a composite USB HID + CDC microcontroller pinned to Core 0 / Core 5 acting as a deterministic 1000 Hz controller bridge, VBLANK-to-DAC phase comparator, and physical appliance toggle switch bank (`lsfg-vk` 2x, Option C `RGBA8`/BC7, 30/60 FPS cap). | Eliminates software polling drift and provides instant physical console toggles without touching config files[cite: 14]. |
+| **6. Hardware VBLANK & HiBy FC3 Clock Phase-Sync Dongle (RP2040 / ESP32-S3)** | Deploy a composite USB HID + CDC microcontroller pinned to Core 0 / Core 5 acting as a deterministic 1000 Hz controller bridge, VBLANK-to-DAC phase comparator, and physical appliance toggle switch bank (`lsfg-vk` 2x, Option C `RGBA8`/BC7, 30/60 FPS cap). | Eliminates software polling drift and provides instant physical console toggles without touching config files. |

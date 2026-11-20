@@ -12,6 +12,7 @@
 
 #include "common/assert.h"
 #include "common/common_types.h"
+#include "common/logging.h"
 #include "shader_recompiler/exception.h"
 #include "shader_recompiler/frontend/maxwell/decode.h"
 #include "shader_recompiler/frontend/maxwell/opcodes.h"
@@ -41,12 +42,15 @@ consteval std::pair<u64, u64> MaskValueFromEncoding(const char data[20]) noexcep
 }
 
 Opcode Decode(u64 insn) {
+    if (insn == 0) {
+        return Opcode::NOP;
+    }
 #define INST(name, cute, encode) \
     if (auto const p = MaskValueFromEncoding(encode); (insn & p.first) == p.second) \
         return Opcode::name;
 #include "maxwell.inc"
 #undef INST
-    ASSERT_MSG(false, "Invalid insn {:#016x}", insn);
+    LOG_DEBUG(Shader, "Invalid insn {:#016x}", insn);
     return Opcode::NOP;
 }
 

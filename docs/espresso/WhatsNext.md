@@ -1,136 +1,63 @@
-# 🗂️ Eden Espresso Wave [AX] & Piccolo [AX] — Master Product & Engineering Backlog
+# 🚀 Eden Espresso Wave [AX] & Piccolo [AX] — Active Sprint Gate (`WhatsNext.md`)
 
-**Programme Banner:** [The Silicon Preservation Society](https://ko-fi.com/thesiliconpreservationsociety)  
-**Current Baseline:** Master `v1.35` | **Unified Plan:** `v1.3` | **Piccolo Spec:** `v0.6` (Sprint 0–5) | **Last Updated:** `2026-11-19`
-
-**Workflow:** Active sprint gate tasks are tracked in `WhatsNext.md`. Completed items move to `CHANGELOG.md`. All Stage A/Stage B baselines, `v1.35–v2.00` releases, UHD 630 silicon offloads, Piccolo appliance milestones, and Linux-first multi-emulator expansion (`ax-sdk`) are organized below.
-
----
-
-## 🏃 Next Sprint & Current Focus
-
-**`v1.35` Async `5.00 GiB` VRAM Shield & `ax-sdk` Integration → First `PGO_stage0LD` Build & Stage A/B Benchmark Gate**
-
-### Milestone Checklist (Reconciled With `WhatsNext.md`)
-* `[✓]` **Milestone 1 — Environment & Core Partitioning:** `clang-cl 23.1+`, `Vulkan 1.4 SDK`, `FFmpeg 7.1.x` LTS, `0x01`/`0x02`/`0x1C`/`0x20` core masks, and IRQ steering configured.
-* `[✓]` **Milestone 2 — `ax-sdk v1.35.0`, Async `5.00 GiB` VRAM Shield & PGO Pipeline Hardening:** Implemented proactive `5.00 GiB` async VRAM shield (`VkVramShield` + `VK_QUEUE_TRANSFER_BIT` + Vulkan 1.4 `vkCmdSetEvent2`/`WaitEvents2` split barriers + Core 5 reaper), dynamic P-core/SMT `2:3:1` topology resolver (`topology.cpp` with `LTP_PC_SMT` + RAII MMCSS cleanup), cache-line-isolated batch SPSC audio ring (`ax::audio` + `lockfree_audio_queue.hpp`), and `validate_profile.ps1` / `eden_engine.ini` staging in `PGO_stage*.bat`.
-* `[★]` **CURRENT POSITION — Milestone 3: `PGO_stage0LD` Compile Verification & Stage A / Stage B Bare-Metal Gate:**
-  * Execute `PGO_config.bat` (`[0LD]`) to verify clean `clang-cl` + `lld-link` compilation across `ax-sdk` and `Eden-Espresso-Wave-AX`.
-  * Compile & log **Stage A Vanilla Control Baseline** (`Clang 23+` 3-Phase PGO + `Vulkan 1.4` + `FFmpeg 7.1.x`, zero AX code) → `Logs\baseline_pgo_metrics.json`, then verify Stage 0 runtime triage (`0x01`/`0x02`/`0x1C`/`0x20` affinity compliance, `VkVramShield` `5.00 GiB` async reaper logs, and `audio_underruns: 0`).
-* `[⏳]` **Milestone 4 — Stage 1 & Stage 2 PGO Bake:** Run `3 × 15 min` sandboxed gameplay sweeps (`LLVM_PROFILE_FILE="eden_%p_%m.profraw"`), pass `Scripts\validate_profile.ps1` (`EXCELLENT_STREAM_READY`), and bake final L1i binary (`PGO_stage2.bat`) diffed against Stage A.
-* `[⏳]` **Milestone 5 — Piccolo Sprint 0 Bare-Metal Gate Cleared:** Boot Linux `6.12-rt` + pinned NVIDIA `580.*` Live USB bench, confirm `rdmsr 0xc8f` Intel CAT status, verify `0` `LOC` ticks on Cores `0–4`, confirm `0` ALSA xruns (`2.00 ms` on `hw:CARD=FC3,DEV=0`), and validate UHD 630 (`VK_API_VERSION_1_3`) `NV12` `dma_buf` ingestion.
+**Programme Banner:** [The Silicon Preservation Society](https://ko-fi.com)  
+**Active Baseline:** `Eden-Espresso-Wave-AX` `v1.35.1` + `ax-sdk` `v1_36_1` (`v1.36.1`) → `v1.37.0`  
+**Target SDK:** `galaxywarriordad/ax-sdk` (`ax::core` `v1_36_1`)  
+**Last Updated:** `2026-11-20`
 
 ---
 
-## 🔬 Reference Silicon & Two-Tier Release Discipline
+## 🎯 Immediate Gate: `v1.35.1` + `ax-sdk v1_36_1` Smoke Test & Git Release (`POST-REBOOT`)
 
-### Stream 1 Reference Hardware & Driver Floor (`Last Supported Ceiling`)
-* **CPU / ISA:** `Intel Core i5-9600K` (`6C/6T`, Zero SMT, `AVX2` + `BMI1/2`, no `AVX-512`).
-* **Discrete GPU:** `NVIDIA GTX 980 Ti` (`Maxwell GM200`, `6 GB` GDDR5) — pinned to **`582.78 WHQL`** (Windows 10) and **`580.*` legacy branch** (Linux Piccolo), supporting **Vulkan `1.4.x` core** (`590+` dropped Maxwell).
-* **Integrated GPU:** `Intel UHD Graphics 630` (`Coffee Lake Gen9.5 GT2`, `24 EUs`, native `2:1` FP16, `VDBOX`, `VEBOX`, `PAK`) — pinned to **`31.0.101.2135`** (Windows 10, capped at **`VK_API_VERSION_1_3`**) and Mesa `ANV` + `intel-media-driver` (`iHD`) on Linux Piccolo.
-* **Multimedia Stack:** **`FFmpeg 7.1.x` LTS** + **`nv-codec-headers 12.2.72.0`**.
+*Objective: Push the local `Eden-Espresso-Wave-AX` `v1_36_1` integration, verify a clean `Stage 0LD` build with live Shared-Memory Telemetry (`Local\AX_Telemetry`), and tag `v1.35.1` before moving on to `v1.37` features.*
 
-### Two-Tier Baseline Policy (`Stage A` vs. `Stage B`)
-* **Stage A (Public / Scientific Control Baseline):** Untouched upstream emulator release (`Eden`, `Cemu`, `RPCS3`, `shadPS4`, `Xenia Canary`) compiled with **`Clang 23+` (`ThinLTO` + 3-Phase PGO)** against **`Vulkan 1.4 SDK`** and **`FFmpeg 7.1.x` LTS** with zero `AX` patches → outputs `baseline_pgo_metrics.json`.
-* **Stage B (Full `[AX]` & `Piccolo [AX]` Release):** Layers our tiny **`ax-sdk`** master core and `< 300 MB` `PREEMPT_RT` Linux appliance onto Stage A, measuring exact $P_{99}$ jitter, VRAM stability, and audio latency deltas against the PGO-baked control.
+### 1. Completed Code, SDK & Tooling Deliverables
+* `[✓]` **Maxwell `GM200` Shader Recompiler & Log Class Fix (`src/shader_recompiler/frontend/maxwell/decode.cpp`):** Fixed `LOG_DEBUG(Shader, ...)` log class compilation and resolved shader decoding stalls (`Loading Shaders 0 / 4`).
+* `[✓]` **Memory Manager & Staging Pool Hardening (`memory_manager.cpp`, `vulkan_device.cpp`, `vk_staging_buffer_pool.cpp`):** Enforced Maxwell `Arch_Maxwell` (`FP16 → FP32` promotion) and bounded the `HOST_VISIBLE` BAR1 staging pool to **`128 MiB`** (`128_MiB BAR1`) to prevent PCIe aperture exhaustion on 6 GB cards.
+* `[✓]` **Fresh Config `LibraryApplet` HLE Defaults (`src/common/settings.h`):** Switched `player_select_applet_mode` and `mii_edit_applet_mode` default values from `AppletMode::LLE` to **`AppletMode::HLE`** (`Custom frontend`) so clean installs boot *Mario Kart 8 Deluxe* profile/Mii selection without silent firmware hangs.
+* `[✓]` **Configurator Hub IRQ Status Parser (`PGO_config.bat`):** Replaced parenthesised `echo %%A | findstr` pipes with direct `findstr /C:"Audio/Timing"`, `"Vulkan Submit"`, and `"Aux Quarantine"` file lookups against `%HW_CHECK_LOG%`.
+* `[✓]` **Live Runtime Triage Filter (`Scripts\tail_eden_log.ps1`):** Created `[TL]` color-coded log tailer filtering `Arch_Maxwell`, `BAR1`, `VramShield`, `ax::`, `topology`, `underrun`, `Loading Shaders`, `Applet`, and `<Error>/<Critical>` events in real time.
+* `[✓]` **Zero-Pollution Shader Validation (`Scripts\shader_validate.ps1`):** Routed `glslangValidator` output to `$env:TEMP\eden_validate.spv` with post-loop cleanup so `frag.spv` is never dropped in the repository root.
+* `[✓]` **Script Workspace Hygiene (`Scripts\dev_tools\` & `ax-sdk/tools/`):** Isolated legacy helper scripts into `Scripts\dev_tools\`, delegated shared host scripts (`Get-AxProfile.ps1`, `check_hardware.ps1`, `set_irq_affinity.ps1 -Revert`, `track_telemetry.ps1`, `check_regression.ps1`, `clean_all.ps1 -Wait`, and Linux `ax_doctor.sh`) to `ax-sdk/tools/` via `Scripts\resolve_ax_tools.bat`, and fixed `Add-Type -MemberDefinition` window positioning across `PGO_stage*.bat`.
+* `[✓]` **`ax-sdk` `v1_36_1` Release & Consumer Wiring (`AX-1.1` – `AX-1.3`):** Published `ax-sdk` `v1_36_1` with `ax::config` (`ax_engine.ini`), target-scoped `CMakeLists.txt` (`cxx_std_20`), cross-process Shared-Memory Telemetry (`Local\AX_Telemetry` / `/dev/shm/ax_telemetry`), and lock-free microsecond audio jitter histograms (`ax::RecordAudioCallbackMetrics`); wired into `Eden` (`sink_stream.cpp`, `flex_asio_manager.cpp`) and `FLAC_AX` (`src/main.cpp`), and aligned all 5 repositories (`ax-sdk`, `Eden-Espresso-Wave-AX`, `FLAC_AX`, `Cemu-Latte-AX`, `Piccolo-AX`) to `v1_36_1`.
 
----
-
-## 🛠️ Completed Subsystem Additions (Sprint 0 Foundation)
-
-### 1. Repository & CI Pipeline Hygiene (Resolved)
-* **2.1 Custom Sub-60s Hygiene Check:** Removed inherited upstream workflows; deployed automated `.forgejo/workflows/hygiene.yml` runner pipeline (`NOMINMAX`, `#undef CreateEvent`, `VK_NO_PROTOTYPES` compliance).
-* **2.2 EOL Line Endings Enforced:** Locked explicit `eol=crlf` (`*.bat`, `*.ps1`) and `eol=lf` (`*.cpp`, `*.h`, `*.md`, `*.sh`, `*.mk`, `*.in`, `*.cfg`, `piccolo`) rules via `.gitattributes`.
-* **2.3 Standardised Script Paths:** Consolidated all root scripts into `Scripts\`, updating relative paths across PGO bakes.
-
-### 2. Phase 2 Throughput, Safety Guards & Core Isolation (Resolved)
-* **3.1 Page-Contiguity & Alignment Guard:** Verified physical page contiguity constraints (`(addr & YUZU_PAGEMASK) + size <= YUZU_PAGESIZE`) inside `vk_ubo_passthrough.cpp` to protect direct template uploads.
-* **3.2 Maxwell `maxPushDescriptors` Ceiling:** Hardcoded the GTX 980 Ti's exact push descriptor slot limits, emitting null-descriptor placeholders on slot overflow.
-* **3.3 SPIR-V Descriptor Clamping:** Clamped `VkImageSubresourceRange` mip/layer bounds inside `vk_texture_cache.cpp` to prevent Maxwell `VK_ERROR_DEVICE_LOST` faults.
-* **3.6 FFmpeg `7.1.x` `execute2` & `libswresample` Hook:** Intercepted internal FFmpeg worker dispatch pipelines via `PinnedVideoFeederExecute2` onto Core 5 (`0x20`) and enforced AVX2 SIMD FIR resampling (`SWR_DITHER_TRIANGULAR_HIGHPASS`) feeding Core 0 (`0x01`).
-
-### 3. Sub-Millisecond Jitter & Microarchitectural Edge Case Correction (Resolved)
-* **Gap 1 — Multi-Core I-Cache Fences:** Integrated sequentially consistent thread fences (`std::memory_order_seq_cst`) inside `live_reopt_daemon.cpp` for pointer hot-swapping.
-* **Gap 2 — Cross-GPU Fence Synchronisation:** Bound explicit `VkExternalSemaphoreKHR` opaque file descriptor fences to wait for planar `NV12` video slices without host RAM staging copies.
-* **Gap 3 — VRAM Compaction Interconnect:** Refined `TextureCacheMatrix` interfaces so `vk_rasterizer.cpp` can evict stale texture layers inside quiet VBLANK windows.
-* **Gap 4 — Non-Blocking VFS Index Maps:** Re-architected predictive I/O migrations into a reader-preferred `std::shared_mutex` hash map for amortized $O(1)$ lookup speeds.
-* **Edge Case 2 — Telemetry Ingestion Rescue:** Restructured packet collections to use a modular circular buffer check across ring boundaries.
-* **Edge Case 3 — Thread Starvation Valve:** Limited contiguous hardware pacing spin loops inside `core_timing.cpp` to a maximum of `100 µs`.
-
-### 4. Tooling, Shader Harmonization & Pipeline Telemetry Automation (Resolved — `2026-11-16`)
-* **2.4 Numeric Shader Macro Harmonizer (`Scripts\macro_update.ps1`):** Enforces explicit numeric defines (`USE_EASU`, `USE_RCAS`, `YUZU_USE_FP16`, `VERSION`) across all shader wrappers.
-* **2.5 Pre-Build SPIR-V Validation Gate (`Scripts\shader_validate.ps1`):** Standardized all wrappers to `#version 460 core` with `#extension GL_GOOGLE_include_directive` header insertion and pre-build `glslangValidator` checks.
-* **2.6 Async Per-Core Telemetry Daemon (`Scripts\telemetry_daemon.ps1`):** Deployed out-of-process profiling of `eden.exe` capturing per-core CPU utilisation, thread affinities, memory footprint, and audio buffer watermarks in JSON format.
-* **2.7 Integrated PGO Stage Gates & Live IRQ Audit Menu:** Wired `macro_update.ps1`, `shader_validate.ps1`, and `telemetry_daemon.ps1` regression assertions into `PGO_stage0LD.bat`, `PGO_stage1.bat`, and `PGO_stage2.bat`, and added live IRQ affinity audit rendering to the root configurator menu.
-* **2.8 Runtime Configuration Schema (`eden_engine.ini`) & Script Guards:** Defined `[EngineTopology]` (`2:3:1` scaler), `[HardwareFeatureFlags]` (Maxwell/QSV/VRAM shields), and `[WindowsPlatformHacks]` (MMCSS Pro Audio & priority classes).
+### 2. Remaining Release Gate (`POST-REBOOT`)
+* `[ ]` **Step A — Finalize & Push Local `Eden-Espresso-Wave-AX` (`C:\Users\nick_\Desktop\eden`):** Remove temporary `build_stage0_triage.log` and duplicate `Scripts\set_irq_affinity.ps1`, verify `Scripts\resolve_ax_tools.bat`, and run `git add -A && git commit && git push`.
+* `[ ]` **Step B — Clean `[0LD]` Build (`build_stage0\bin\eden.exe`):** Run `PGO_config.bat` → `0LD` to pull `ax-sdk` (`v1_36_1`) via `FetchContent` and compile `build_stage0\bin\eden.exe` cleanly.
+* `[ ]` **Step C — Single-Window `[TL]` + Shared-Memory Telemetry Smoke Test (*Mario Kart 8 Deluxe* + `HiBy FC3` DAC):** Select `TL` in `PGO_config.bat` (auto-running `reset_eden_config.ps1`), verify `Arch_Maxwell` (`FP16 → FP32`), `128_MiB BAR1`, HLE Applets, `"TelemetrySource": "SharedMemory"` in `build_stage_telemetry_metrics.json`, `0` errors, and `0` audio underruns, then tag `v1.35.1`.
 
 ---
 
-## 🔄 Piccolo Sprint-to-Master Release Crosswalk (`v1.35` – `v2.00`)
+## ⚙️ Sprint `v1.36` — Remaining `ax-sdk` Polish & Engine VRAM/BAR1/QSV Features
 
-| Piccolo Sprint | Piccolo Version | Master Release | Target Medium | Core Focus & Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **Sprint 0** | Gate | `v1.34` (3.8) | Live USB Bench | `[ACTIVE GATE]` Bare-metal `6.12-rt` + NVIDIA `580.*` + invariant TSC + `NV12` `dma_buf` + HiBy FC3 gate. |
-| **Sprint 1** | MVP (`v0.6`) | `v1.35` (5.5, 5.8) | Samsung FIT Plus | `[UP NEXT]` `< 300 MB` `toram` EROFS USB boot, A/B fallback, loading-screen core bursting (`0x1C`), `ax-sdk` extraction. |
-| **Sprint 2** | `v0.7` | `v1.35` (5.5, 5.9) | Samsung FIT Plus | `[STAGED]` `6 × 1G` + `1024 × 2M` HugeTLB (`5.0 GB` floor), `io_uring` memory pinning, `2.00 ms` PLL ALSA, **Cemu `[AX]`** bring-up. |
-| **Sprint 3** | `v0.8` | `v1.35` (5.1–5.4) | Samsung FIT Plus | `[STAGED]` `5.50 GB` / `5.35 GB` VRAM shield, `64 KB` sparse VMA pool, **UHD 630 FP16 (`24 EUs`) `ASTC → BC7`** transcode. |
-| **Sprint 4** | `v0.9` | `v1.36` (6.1–6.7) | Samsung FIT Plus | `[STAGED]` WinRT WGC / `lsfg-vk 2.0.0+` bindless layers, **UHD 630 `VEBOX` (`NV12 → RGBA` + deinterlace)**, `256 MB BAR1` WC. |
-| **Sprint 5** | `v1.0` → `v2.00` | `v1.37` – `v2.00` | Samsung FIT Plus | `[ROADMAP]` Closed-loop governor calibration, **RPCS3 `[AX]` → shadPS4 `[AX]` → Xenia `[AX]`** Linux rollout, live Re-LLVM JIT. |
+*Objective: Complete remaining `ax-sdk` single-header amalgamation (`AX-1.4`), wire live GPU VRAM/QSV counters into `ax::GetTelemetry()`, and re-integrate the proactive `5.00 GiB` VRAM shield, frame-fenced BAR1 recycling, and cross-GPU QSV/VA-API video offload.*
 
----
+### Part 1: `ax-sdk` Repository (`galaxywarriordad/ax-sdk`)
+* `[✓]` **1. `AX-1.1` Unified Settings & Platform Macros (`include/ax/config.hpp`, `src/config.cpp`):** Implemented `ax::LoadEngineConfig` / `ax::WriteDefaultEngineConfig` (`ax_engine.ini`) and standardized `AX_PLATFORM_*` / `AX_HAS_*` macros.
+* `[✓]` **2. `AX-1.2` CMake Target-Scope & Hygiene Refactor (`CMakeLists.txt`):** Replaced global C++ standard mutation with `target_compile_features(ax_core ... cxx_std_20)`, `Threads::Threads`, private Win32 macro scoping, and opt-in `AX_SDK_ENABLE_WARNINGS`.
+* `[✓]` **3. `AX-1.3` Shared-Memory Atomic Telemetry & Audio Jitter Profiler (`include/ax/telemetry.hpp`, `src/telemetry.cpp`):** Implemented 64B-padded `TelemetryCounters` (`Local\AX_Telemetry` / `/dev/shm/ax_telemetry`) and lock-free `min / P99 / max` microsecond audio callback histograms (`ax::RecordAudioCallbackMetrics`).
+* `[ ]` **4. `AX-1.4` Single-Header Amalgamation Generator (`tools/amalgamate.ps1`, `.github/workflows/release.yml`):** Create a deterministic script bundling `include/ax/*.hpp` in topological dependency order (`config.hpp` → `telemetry.hpp` → `topology.hpp` → `memory.hpp` → `vram.hpp` / `igpu.hpp` / `audio.hpp`) and attach `ax_sdk.hpp` to tagged GitHub releases.
 
-## 📊 Scheduled Future Releases (`v1.35` – `v2.00`)
-
-> **Phase 3 Dependency Gate Matrix:** Activity **5.7 (Runtime Hardware Feature Flags)** is the active prerequisite gate for **5.10, 6.8, and 6.9**. Completing `5.7` guarantees that all Maxwell `GM200`-exclusive overrides remain dynamically encapsulated behind runtime capability checks rather than hardcoded paths.
-
-| Release | Phase / Sprint | Activity ID & Name | Target Components | Specific Engineering Activities |
-| :--- | :--- | :--- | :--- | :--- |
-| **`v1.35`** | Pipeline | **4.1 Unified Stage 0–2 Orchestrator** | `Scripts\build_all.ps1` | Wrap Stage A & Stage B Stage 0/1/2 builds + `validate_profile.ps1` with automatic SHA256 hashing and side-by-side telemetry diffing against `baseline_pgo_metrics.json`. |
-| **`v1.35`** | Pipeline | **4.2 `sccache` & Build Manifest** | `CMakeLists.txt`, `build_manifest.json` | Enable `sccache` compiler caching for `~15s` incremental C++20 rebuilds and emit a JSON manifest. |
-| **`v1.35`** | Pipeline | **4.3 Portable Release Packager** | `Scripts\package_release.ps1` | `[VERIFIED]` Bundle compiled SPIR-V bytecode, required DLLs, and configs into versioned archives. |
-| **`v1.35`** | Pipeline | **4.4 Automated Frametime & PAK Capture Harness** | `Scripts\benchmark_frametimes.ps1`, Piccolo CI | `[VERIFIED]` Execute repeatable 60-second deterministic replay runs tracking 1% and 0.1% low stutters; wire UHD 630 PAK (`h264_vaapi`) hardware video capture on Piccolo for zero-overhead benchmark recording. |
-| **`v1.35`** | Pipeline / Telemetry | **4.5 Telemetry & Batch Resilience Hardening** | `Scripts\telemetry_daemon.ps1`, `PGO_stage*.bat`, `.forgejo/` | Add ASIO underrun and voice-drop counters to audio telemetry; expand batch error rollback handling; extend CI hardware gate checks; wire `eden_engine.ini` flags into shader macro paths. |
-| **`v1.35`** | Phase 3 / Sprint 3 | **5.1 Proactive `5.00 GiB` Async VRAM Shield** | `ax-sdk/include/ax/vram.hpp`, `vk_vram_shield.hpp`, `vk_rasterizer.cpp` | `[COMPLETED]` Proactive `5.00 GiB` (`kPruneTriggerBytes`) async prune trigger (`~4.50 GiB` hysteresis recovery) ahead of `5.50 / 5.35 GiB` ceilings; offloads frees via `VK_KHR_timeline_semaphore` to Core 5 (`Domain::Housekeeping`) with zero VBLANK stalls. |
-| **`v1.35`** | Phase 3 / Sprint 3 | **5.2 `64 KB` Sparse VMA Pool** | `vk_rasterizer.cpp`, `texture_reaper.cpp` | `[STAGED]` Back dynamic render targets with a pre-allocated `64 KB` Sparse pool paired with async defragmentation. |
-| **`v1.35`** | Phase 3 / Sprint 3 | **5.3 UHD 630 FP16 `ASTC → BC7/BC6H` Transcode** | `texture_cache.*`, `astc_to_bc7.comp`, `vaapi_dmabuf_bridge.hpp` | Dispatch `ASTC → BC7/BC6H` compute shaders onto Intel UHD 630's 24 native-FP16 EUs (`VK_API_VERSION_1_3` capped) via `dma_buf` / NT Shared Handle to eliminate Maxwell `GM200` `1:64` FP16 and compute time-slicing stalls (with GTX 980 Ti single-GPU fallback). |
-| **`v1.35`** | Phase 3 / Sprint 1–2 | **5.5 Batch SPSC Audio Ring & Piccolo ALSA** | `ax-sdk/include/ax/audio.hpp`, `lockfree_audio_queue.hpp`, `ax_platform_shim.hpp` | `[COMPLETED — RING]` Cache-line-isolated `LockFreeStereoRing<2048, float>` (`PushBatch`/`PopBatch`/`PopPlanarBatch`) with per-callback telemetry; `[CODE READY — ALSA]` `hw:CARD=FC3,DEV=0` under `SCHED_FIFO 99` (`2.00 ms` + `±0.005%` micro-PLL). |
-| **`v1.35`** | Phase 3 / Sprint 1 | **5.6 `ax-sdk` Extraction & Dynamic `2:3:1` Scaler** | `ax-sdk` repo, `src/topology.cpp`, `eden_engine.ini` | `[COMPLETED]` Standalone `ax-sdk` (`ax::core`) integrated via `FetchContent` (`WIN32`-gated ASIO/FlexASIO); implemented `GetLogicalProcessorInformationEx` (`LTP_PC_SMT` + `EfficiencyClass`) & Linux `sysfs` P-core `2:3:1` scaler with RAII MMCSS cleanup and `HostTimingPriorityClass=HIGH`. |
-| **`v1.35`** | Phase 3 | **5.7 Runtime Hardware Flags** | `vk_device.cpp`, `vulkan_device.h` | `[CODE READY]` Encapsulate Maxwell capabilities queries behind clean runtime vendor checks to cut merge friction. |
-| **`v1.35`** | Phase 3 | **5.10 `GM200` `FP16 → FP32` Promotion** | `emit_spirv.cpp`, `vk_device.cpp` | Detect Maxwell `GM200` at runtime to promote Switch 3D shader `FP16` ops to native `FP32`, bypassing half-precision penalties. |
-| **`v1.36`** | Phase 4 / Sprint 4 | **6.2 Async Compute & `VEBOX` Media Offload** | `vk_device.h/.cpp`, `vaapi_dmabuf_bridge.hpp` | `[CODE READY]` Open secondary `VK_QUEUE_COMPUTE_BIT` queues with timeline semaphores; route cutscene `NV12 → RGBA` conversion, deinterlacing (`480i`/`1080i`), and scaling through UHD 630's fixed-function `VEBOX` pipe (`VAEntrypointVideoProc`) using zero EU shaders. |
-| **`v1.36`** | Phase 4 | **6.8 Dedicated `VK_QUEUE_TRANSFER_BIT` & Split Barriers** | `vulkan_device.h/.cpp`, `vulkan_wrapper.h/.cpp`, `vk_vram_shield.hpp` | `[COMPLETED]` Discovered dedicated `VK_QUEUE_TRANSFER_BIT` hardware queue families in `Device::SetupFamilies()` and wired Vulkan 1.4 Synchronization2 split barriers (`vkCmdSetEvent2` → `vkCmdWaitEvents2`) for zero-stall async DMA & VRAM eviction. |
-| **`v1.36`** | Phase 4 | **6.9 `256 MB BAR1` Write-Combined Pool** | `vk_memory_manager.cpp` | `[CODE READY]` Carve a bounded sub-pool out of `GM200`'s `HOST_VISIBLE` aperture for direct zero-copy UBO mapping. |
+### Part 2: `Eden-Espresso-Wave-AX` Engine & Tooling
+* `[ ]` **5. Wire GPU VRAM, BAR1 & QSV Counters into `ax::GetTelemetry()` (`vk_rasterizer.cpp`, `vk_staging_buffer_pool.cpp`, `qsv_decoder.cpp`):** Populate `vram_used_bytes`, `vram_reaps`, `bar1_stalls`, `igpu_offloads`, and `qsv_frames_decoded` so `track_telemetry.ps1` streams live GPU/iGPU metrics from `Local\AX_Telemetry`.
+* `[ ]` **6. L3 Cache ID (CCX) Grouping (`ax-sdk/src/topology.cpp`):** Group logical processors by Windows `RelationCache` (`Level == 3`) and Linux `cache/index3/shared_cpu_list` so `AudioTiming`, `VulkanSubmission`, and `GuestJit` stay pinned within a single L3 slice on multi-CCX Ryzen CPUs.
+* `[ ]` **7. Re-Integrate Proactive `5.00 GiB` Async `VkVramShield` + Rolling VBLANK Slack (`vk_vram_shield.hpp`, `vk_rasterizer.cpp`):** Re-enable the `5.00 GiB` (`kPruneTriggerBytes`) async `VK_QUEUE_TRANSFER_BIT` reaper (`~4.50 GiB` hysteresis target) ahead of the `5.50 GiB` (`5.35 GiB` LSFG) ceiling with `RecordFrameCompletion(uint64_t gpu_time_ns)` and runtime `synchronization2` capability gating.
+* `[ ]` **8. `256-Byte` Aligned Persistent `BAR1` Ring & Size-Class Texture Sub-Allocator (`vk_staging_buffer_pool.cpp`, `vulkan_memory_allocator.cpp`):** Enforce Maxwell `GM200`'s `256-byte` `minUniformBufferOffsetAlignment` bump-allocation inside the `128 MiB BAR1` ring and group textures into power-of-two size-class slabs (`64 KiB`–`16 MiB`).
+* `[ ]` **9. Cross-GPU QSV / VA-API Video Offload (`6.2`) & `64 KB` Sparse VMA Pool (`5.2`):** Wire `QSVHardwareDecoderRing` (`VK_KHR_external_memory_win32` + `VK_API_VERSION_1_3` UHD 630 check) and `vaapi_dmabuf_bridge.hpp`, and back dynamic render targets with a `64 KB` Sparse VMA pool.
+* `[ ]` **10. Stage A vs. Stage B PGO Bake & `i5-8600K` Validation:** Run `3 × 15 min` gameplay sweeps (`PGO_stage1.bat`), pass `validate_profile.ps1`, bake `PGO_stage2.bat`, and log diff against Stage A `baseline_pgo_metrics.json`.
 
 ---
 
-## 🌍 Linux-Only Multi-Emulator Expansion (`ax-sdk` + `Piccolo [AX]`)
+## 🔥 Sprint `v1.37` — UHD 630 FP16 `ASTC → BC7` Transcode, `ax-sdk` Lifecycle/CI & `Piccolo-AX`
 
-**Strategy:** Windows 10 support concludes with **Eden Espresso Wave `[AX]`** (`v1.37` / `v2.00`). All subsequent emulators target Linux natively inside **Piccolo `[AX]`** via thin adapter forks linked to the tiny `ax-sdk` master repository, each validated against its own Stage A Vanilla LLVM + Vulkan 1.4 + 3-Phase PGO baseline.
+*Objective: Deploy hardware-accelerated `ASTC → BC7` 4:1 texture transcoding on Intel UHD 630, finalize `ax-sdk` `v1.37.0` lifecycle/unit-test infrastructure (`AX-1.5` → `AX-1.6`), and bring up the bare-metal `Piccolo-AX` Linux appliance.*
 
-| Order | Target Fork | Build & Toolchain Guardrails | Core `ax-sdk` & Hardware Stream Integration |
-| :--- | :--- | :--- | :--- |
-| **#1** | **Cemu-AX** (Wii U) | Native CMake + Ninja + Clang 23+ (ThinLTO + 3-Phase PGO); developed alongside Piccolo Sprint 2–3. | Pins 3-core PowerPC Espresso JIT onto `0x1C`; routes `cubeb` to Core 0 `2.00 ms` ALSA ring; reuses `vk_vram_shield.hpp` and `VEBOX` deinterlacing. |
-| **#2** | **RPCS3-AX** (PS3) | Mandatory `-DBUILD_LLVM=ON -DSTATIC_LINK_LLVM=ON` (isolates SPU JIT from host Clang 23+ / LLVM 22+ regressions); `-DUSE_NATIVE_INSTRUCTIONS=OFF`; patch LTO guard for headless SDL2 appliance build. | Isolates 1 PPU + primary SPUs on `0x1C` / CCX 0; quarantines SPU LLVM workers on Core 5 (`0x20`) with `_MM_HINT_NTA`; enables `mitigations=off`. |
-| **#3** | **shadPS4-AX** (PS4) | Modern C++20 + CMake + Clang 23+ (ThinLTO + 3-Phase PGO); developed on Stream 3 (11th Gen AVX-512 + `8 GB+` VRAM) before down-porting. | Backs `8 GB` unified memory via `6 × 1G` + `1024 × 2M` HugeTLB + `17.5 GB` `vmtouch -dql`; backports to Stream 1 (`9600K` + `980 Ti 6 GB`) via `5.35 GB` VRAM Shield + `64 KB` sparse VMA aliasing. |
-| **#4** | **Xenia-AX** (Xbox 360) | Clang 23+ + Ninja (`xb` build); sequenced after `shadPS4-AX` to allow upstream Linux Vulkan backend maturity. | Maps Xenon worker threads onto `0x1C` (`0x3C` spillover), optimizes ROV split barriers, and streams constant buffers via `256 MB BAR1` WC pool. |
+### Part 1: `ax-sdk` Repository (`galaxywarriordad/ax-sdk` → `v1.37.0`)
+* `[ ]` **1. `AX-1.5` Explicit `ax::Context` & Lifecycle API (`include/ax/ax.hpp`, `src/ax.cpp`):** Replace implicit static initialization with deterministic `ax::Status ax::Init(const ax::Config&)` and `void ax::Shutdown()`.
+* `[ ]` **2. `AX-1.6` Hardware-Mock Unit & Concurrency CI Suite (`tests/`, `.github/workflows/ci.yml`):** Abstract CPU/GPU topology queries behind injectable mock descriptors and build CMake `CTest` suites (`test_audio_ring.cpp`, `test_topology.cpp`, `test_vram_shield.cpp`) across Windows (`clang-cl`) and Linux (`Clang`/`GCC`) GitHub Actions runners.
 
----
-
-## 🔒 Appliance Mode & Kiosk Hardening Roadmap (Post-Maturity Backlog)
-
-| Release | Phase / Sprint | Activity ID & Name | Target Components | Specific Engineering Activities |
-| :--- | :--- | :--- | :--- | :--- |
-| **`v1.37`** | Phase 5 / Kiosk | **7.1 Direct Boot & Kiosk Launcher** | `main.cpp`, `core.cpp` | `[BACKLOG]` Implement automatic ROM path checks, instant core load, and borderless exclusive full-screen windows. |
-| **`v1.37`** | Phase 5 / Kiosk | **7.2 Controller Profile Freeze** | `input_subsystem.cpp` | `[BACKLOG]` Lock standard gamepad bindings in code, disable input remapping dialogs, and prevent hotkey overrides. |
-| **`v1.37`** | Phase 5 / Kiosk | **7.3 Filesystem Sandbox & NAND** | `fs_util.cpp`, `path_util.cpp` | `[BACKLOG]` Redirect virtual NAND, save directories, and cache paths into a write-protected container. |
-| **`v1.37`** | Phase 5 / Kiosk | **7.4 Branding Sanitization** | `main_window.cpp` | `[BACKLOG]` Purge remaining upstream references across crash handlers and window headers in favor of The Silicon Preservation Society (`[AX]`). |
-
----
-
-## 🚫 Architectural Guardrails & Rejected Candidates
-
-* **Two-Tier Baseline Discipline (Stage A vs. Stage B):** Never ship or benchmark an `[AX]` build without first logging its unmodified upstream Stage A (`Clang 23+` + `Vulkan 1.4` + `FFmpeg 7.1.x` + 3-Phase PGO) control baseline (`baseline_pgo_metrics.json`).
-* **No Post-Espresso Windows Porting & No Bloated Desktop Linux Packaging:** Windows 10 support ends at **Eden Espresso Wave `[AX]`**. All subsequent emulators (`Cemu`, `RPCS3`, `shadPS4`, `Xenia Canary`) target Linux natively inside the `< 300 MB` `Piccolo [AX]` `toram` EROFS appliance via `ax-sdk`—never general-purpose PipeWire/Wayland desktop Linux packages.
-* **No Dynamic Work-Stealing Thread Pools:** Do not replace static core partitioning (`0x01`/`0x02`/`0x1C`/`0x20`) with dynamic work-stealing schedulers; synchronization overhead and cache-line migration penalties undermine the zero-jitter determinism of `[AX]`.
-* **Strict `< 300 MB` `toram` EROFS Budget:** Never pull PipeWire, PulseAudio, Openbox/Wayland compositors, NVIDIA CUDA/OptiX/NVENC blobs, or Mesa LLVM drivers into `batocera-ax-external/`.
-* **Rejected — `PA-05` (AOT `ARM64 → x86_64` Persistent Disk Cache):** Rejected due to self-modifying code (SMC) hazards, heavy upstream Dynarmic/loader merge friction, and functional overlap with Activity `8.1`[cite: 10, 11, 12].
+### Part 2: Engine, Transcoding & `Piccolo-AX` Appliance (`v1.37.0`)
+* `[ ]` **3. Zero-Copy `VK_KHR_external_memory_win32` / `dma_buf` UHD 630 FP16 (`24 EUs`) `ASTC → BC7 / BC6H` Compute Transcoder (`5.3`):** Dispatch async `ASTC → BC7` block encoding onto Intel UHD 630's 24 native `2:1` FP16 EUs and transfer directly into `GTX 980 Ti` VRAM (`<= 3.50 GB/s` ring-bus cap) without a system-RAM bounce.
+* `[ ]` **4. Batched Guest SMC Page-Protection Invalidations (`ax::memory`):** Batch `VirtualProtect` / `mprotect` updates to eliminate 4 KB page-fault storms during self-modifying code flushes.
+* `[ ]` **5. `Piccolo-AX` Sprint 0–2 Bare-Metal Bring-Up & Cross-App USB DAC Arbitration (`/run/lock/ax-dac.lock`):** Boot Linux `6.12-rt` + pinned NVIDIA `580.*` driver inside `< 300 MB` `lz4hc,9` `toram` EROFS image, verify via `ax-sdk/tools/ax_doctor.sh`, coordinate `flock()` ownership across `Eden-AX`, `Cemu-AX`, and `FLAC_AX` on `hw:CARD=FC3,DEV=0`, and bring up `Cemu-Latte-AX`.
+* `[ ]` **6. Kiosk & Appliance Hardening (`7.1` – `7.4`):** Wire direct-boot ROM path checks, borderless exclusive full-screen startup, controller profile freeze, write-protected virtual NAND sandboxing, and `[AX]` branding sanitization.

@@ -1,7 +1,7 @@
 # 🗂️ Eden Espresso Wave [AX] & Piccolo [AX] — Master Product & Engineering Backlog
 
-**Programme Banner:** [The Silicon Preservation Society](https://ko-fi.com/thesiliconpreservationsociety)  
-**Current Baseline:** Master `v1.35` | **Unified Plan:** `v1.4` | **Piccolo Spec:** `v0.6` (Sprint 0–5) | **Last Updated:** `2026-11-19`
+**Programme Banner:** [The Silicon Preservation Society](https://ko-fi.com)  
+**Current Baseline:** Master `v1.35.1` / `ax-sdk` `v1_36_1` | **Unified Plan:** `v1.4` | **Piccolo Spec:** `v0.6` (Sprint 0–5) | **Last Updated:** `2026-11-20`
 
 **Workflow:** Active sprint gate tasks are tracked in `WhatsNext.md`. Completed items move to `CHANGELOG.md`. All Stage A/Stage B baselines, `v1.35.0–v2.00` releases, UHD 630 silicon offloads, Piccolo appliance milestones, and Linux-first multi-emulator expansion (`ax-sdk`) are organized below.
 
@@ -9,28 +9,30 @@
 
 ## 🏃 Next Sprint & Current Focus
 
-**`v1.34` Bare-Metal Gate Confirmation → `v1.35.0` (Pipeline Automation, `ax-sdk` Extraction & Runtime Capability Gates)**
+**`v1.34` Bare-Metal Gate Confirmation → `v1.35.1` / `ax-sdk v1_36_1` (Shared-Memory Telemetry, Aggregated `tools/` & Bare-Metal Gate)**
 
 ### Milestone Checklist (Reconciled With `WhatsNext.md`)
 * `[✓]` **Milestone 1 — Environment & Core Partitioning:** `clang-cl 23.1+`, `Vulkan 1.4 SDK`, `FFmpeg 7.1.x` LTS, `0x01`/`0x02`/`0x1C`/`0x20` core masks, and IRQ steering configured.
-* `[✓]` **Milestone 2 — `PGO_stage0` Build & Pipeline Automation:** `build_stage0\bin\eden.exe` compiled and linked cleanly; `Scripts\macro_update.ps1`, `Scripts\shader_validate.ps1`, `Scripts\telemetry_daemon.ps1`, and live IRQ menu audits integrated across all PGO stage batch scripts.
-* `[✓]` **Milestone 2.5 — 4-Repository Polyrepo Topology & `ax-sdk` (`v1.35.0`) Extraction:** Established `Eden-Espresso-Wave-AX`, `ax-sdk` (`v1.35.0` tagged), `Piccolo-AX`, and `Cemu-Latte-AX` repositories; updated root `CMakeLists.txt` with `FetchContent` (`GIT_SHALLOW FALSE` for CMake 4.x tag checkout) and `ax::core` linkage.
-* `[✓]` **Milestone 2.6 — Async `5.00 GiB` Vulkan 1.4 VRAM Shield, Dynamic `2:3:1` Topology & Batch SPSC Audio Ring:** Implemented `ax::vram` (`5.00 GiB` async prune trigger + `~4.50 GiB` hysteresis), `VkVramShield` (`VK_QUEUE_TRANSFER_BIT` + Vulkan 1.4 `vkCmdSetEvent2`/`WaitEvents2` + Core 5 reaper), `ax::topology` (`GetLogicalProcessorInformationEx` `LTP_PC_SMT`/`EfficiencyClass` + Linux `sysfs` `2:3:1` scaler + RAII MMCSS cleanup), and 64B-padded `LockFreeStereoRing` (`PushBatch`/`PopBatch`/`PopPlanarBatch`).
+* `[✓]` **Milestone 2 — `PGO_stage0` Build & Pipeline Automation:** `build_stage0\bin\eden.exe` compiled and linked cleanly; `Scripts\macro_update.ps1`, `Scripts\shader_validate.ps1`, and live IRQ menu audits integrated across all PGO stage batch scripts.
+* `[✓]` **Milestone 2.5 — 5-Repository Polyrepo Topology & `ax-sdk` (`v1_36_1`) Consolidation:** Established `Eden-Espresso-Wave-AX`, `ax-sdk` (`v1_36_1` tagged), `Piccolo-AX`, `Cemu-Latte-AX`, and `FLAC_AX` repositories; aggregated shared host tooling into `ax-sdk/tools/` (`Get-AxProfile.ps1`, `check_hardware.ps1`, `set_irq_affinity.ps1 -Revert`, `track_telemetry.ps1`, `check_regression.ps1`, `clean_all.ps1 -Wait`, and Linux `ax_doctor.sh`).
+* `[✓]` **Milestone 2.6 — Async `5.00 GiB` Vulkan 1.4 VRAM Shield, Dynamic `2:3:1` Topology, Unified Settings & Shared-Memory Telemetry:** Implemented `ax::vram` (`5.00 GiB` async prune trigger + `~4.50 GiB` hysteresis), `VkVramShield`, `ax::topology`, `ax::config` (`ax_engine.ini`), and 64B-padded cross-process shared-memory telemetry (`Local\AX_Telemetry` / `/dev/shm/ax_telemetry`) + microsecond audio jitter profiler (`ax::RecordAudioCallbackMetrics`) wired into `Eden` (`sink_stream.cpp`, `flex_asio_manager.cpp`) and `FLAC_AX`.
 * `[★]` **CURRENT POSITION — Milestone 3: `PGO_stage0LD` Build Verification & Stage A / Stage B Bare-Metal Gate:**
-  * Complete Stage 0LD (`PGO_stage0LD.bat`) clean build verification with `ax::core` (`v1.35.0`) linked.
+  * Complete Stage 0LD (`PGO_stage0LD.bat`) clean build verification with `ax::core` (`v1_36_1`) linked and `Local\AX_Telemetry` active.
   * Compile & log **Stage A Vanilla Control Baseline** (`Clang 23.1+` 3-Phase PGO + `Vulkan 1.4` + `FFmpeg 7.1.x`, zero AX code) → `Logs\baseline_pgo_metrics.json`.
-  * Complete Stage 0 runtime triage (`0x01`/`0x02`/`0x1C`/`0x20` affinity verification + `audio_underruns: 0`), wire ASIO underrun/voice-drop counters into `telemetry_daemon.ps1`, add batch rollback guards, and verify `topology.cpp` (`LTP_PC_SMT` + `<windows.h>` isolation).
+  * Complete Stage 0 runtime triage (`0x01`/`0x02`/`0x1C`/`0x20` affinity verification + `audio_underruns: 0` + live shared-memory jitter metrics).
 * `[⏳]` **Milestone 4 — Stage 1 & Stage 2 PGO Bake:** Run `3 × 15 min` sandboxed gameplay sweeps (`LLVM_PROFILE_FILE="eden_%p_%m.profraw"`), pass `Scripts\validate_profile.ps1` (`EXCELLENT_STREAM_READY`), and bake final L1i binary (`PGO_stage2.bat`) diffed against Stage A.
-* `[⏳]` **Milestone 5 — Piccolo Sprint 0 Bare-Metal Gate Cleared:** Confirm BIOS `IGD Multi-Monitor: Enabled`, boot Linux `6.12-rt` + pinned NVIDIA `580.*` Live USB bench, confirm `rdmsr 0xc8f` Intel CAT status, verify `0` `LOC` ticks on Cores `0–4`, confirm `0` ALSA xruns (`2.00 ms` on `hw:CARD=FC3,DEV=0`), and validate UHD 630 (`VK_API_VERSION_1_3`) `NV12` `dma_buf` ingestion.
+* `[⏳]` **Milestone 5 — Piccolo Sprint 0 Bare-Metal Gate Cleared:** Confirm BIOS `IGD Multi-Monitor: Enabled`, boot Linux `6.12-rt` + pinned NVIDIA `580.*` Live USB bench, run `ax-sdk/tools/ax_doctor.sh`, confirm `rdmsr 0xc8f` Intel CAT status, verify `0` `LOC` ticks on Cores `0–4`, confirm `0` ALSA xruns (`2.00 ms` on `hw:CARD=FC3,DEV=0`), and validate UHD 630 (`VK_API_VERSION_1_3`) `NV12` `dma_buf` ingestion.
 
 ---
 
-## 🛠️ Tooling, Build Pipeline & Repo Hygiene Backlog (`2026-11-18`)
+## 🛠️ Tooling, Build Pipeline & Repo Hygiene Backlog (`2026-11-20`)
 
-* `[ ]` **Synchronous Cleanup Gate (`Scripts\clean_all.ps1`):** Add a `-Wait` parameter (or block on the background deletion worker when invoked from `PGO_config.bat` / `PGO_stage*.bat`) so `.cache` and `build_stage*` purges complete deterministically before CMake configuration begins.
-* `[ ]` **Configurator Window Positioning Fix (`Scripts\PGO_stage*.bat`):** Remove the conflicting `-Name WWindowUtil -Namespace ...` flags from `Add-Type -TypeDefinition $w_code` (or switch to `-MemberDefinition`) to eliminate the cosmetic `AmbiguousParameterSet` PowerShell warning on launch.
-* `[ ]` **Cross-Platform Line-Ending Normalization (`.gitattributes`):** Add/verify a root `.gitattributes` across all four repositories (`* text=auto`, `*.bat eol=crlf`, `*.ps1 eol=crlf`, `*.sh eol=lf`, `*.md eol=lf`) to eliminate CRLF/LF Git warnings and protect Linux appliance scripts (`post-build.sh`, `verify_ax_appliance.sh`) from accidental CRLF corruption on Windows.
-* `[ ]` **Local `ax-sdk` Dev Override / SHA Pinning:** Support `-DFETCHCONTENT_SOURCE_DIR_AX_SDK=<local_path>` (or pin full 40-char commit SHAs in `GIT_TAG` during active cross-repo development) so iterative `ax-sdk` edits do not require re-tagging releases mid-sprint.
+* `[✓]` **Synchronous Cleanup Gate (`ax-sdk/tools/clean_all.ps1 -Wait`):** Added `-Wait` parameter to `clean_all.ps1` and wired it into `PGO_config.bat`, `PGO_stage0LD.bat`, and `PGO_stage1.bat` so `.cache` and `build_stage*` purges complete deterministically before CMake configuration begins.
+* `[✓]` **Configurator Window Positioning Fix (`Scripts\PGO_stage*.bat`):** Switched `Add-Type -TypeDefinition $w_code -Name WWindowUtil` to `-MemberDefinition $w_code -Name WWindowUtil` across `PGO_stage0.bat`, `PGO_stage0LD.bat`, and `PGO_stage1.bat` to eliminate the `AmbiguousParameterSet` warning on launch.
+* `[✓]` **Local `ax-sdk` Dev Override & Tag Pinning (`CMakeLists.txt`):** Added automatic `AX_SDK_DIR` and `../ax-sdk` resolution ahead of `FetchContent_Declare(ax_sdk ... GIT_TAG v1_36_1 GIT_SHALLOW FALSE)` across `Eden`, `Cemu-Latte-AX`, and `FLAC_AX`.
+* `[✓]` **Aggregated Cross-App Tooling & Config Decoupling (`ax-sdk/tools/` & `ax_engine.ini`):** Extracted shared scripts (`Get-AxProfile.ps1`, `check_hardware.ps1`, `set_irq_affinity.ps1 -Revert`, `track_telemetry.ps1`, `check_regression.ps1`, `clean_all.ps1`, `ax_doctor.sh`) into `ax-sdk/tools/` via `Scripts\resolve_ax_tools.bat`, and decoupled personal drive checks (`J:\Switch`) and DAC names into `ax_engine.ini` / `hardware_profiles.json`.
+* `[✓]` **Opt-In Safety Guards & Reversible IRQ Rollback (`set_irq_affinity.ps1 -Revert`):** Added `-Revert` support to `set_irq_affinity.ps1` to restore stock Windows PnP interrupt routing cleanly.
+* `[ ]` **Cross-Platform Line-Ending Normalization (`.gitattributes`):** Add/verify a root `.gitattributes` across all five repositories (`* text=auto`, `*.bat eol=crlf`, `*.ps1 eol=crlf`, `*.sh eol=lf`, `*.md eol=lf`) to protect Linux appliance scripts (`post-build.sh`, `ax_doctor.sh`, `verify_ax_appliance.sh`) from accidental CRLF corruption on Windows.
 * `[ ]` **Vertical-Slice Execution Order:** Complete Stage 0LD + 3-Phase PGO verification on `Eden-Espresso-Wave-AX` (Windows 10) end-to-end before switching context to `Cemu-Latte-AX` PGO sweeps and the `Piccolo-AX` Buildroot `BR2_EXTERNAL` image build.
 
 ---
@@ -82,6 +84,10 @@
 * **2.9 Multi-Repository Network Live:** Established `Piccolo-AX` (`GPL-3.0`), `ax-sdk` (`MIT`, tagged `v1.35.0`), `Cemu-Latte-AX` (`MPL-2.0`), and `Eden-Espresso-Wave-AX` (`GPL-3.0` on Forgejo) with unified root governance files (`AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `REPO_TOPOLOGY.md`).
 * **2.10 CMake `FetchContent` (`GIT_SHALLOW FALSE`) & `ax::core` Linkage:** Integrated `ax-sdk` (`v1.35.0`) into `Eden-Espresso-Wave-AX` (`CMakeLists.txt`) and `Cemu-Latte-AX` (`src/CMakeLists.txt`), and aligned `cemu-latte-ax.mk` for Cemu 2.x (`-DENABLE_VCPKG=OFF`, `-DALLOW_PORTABLE=OFF`, `sdl3`, `wxwidgets`).
 
+### 6. `ax-sdk` `v1_36_1` Shared-Memory Telemetry, Audio Jitter Profiler & 5-Repo Tooling Consolidation (Resolved — `2026-11-20`)
+* **2.11 Shared-Memory Telemetry & Audio Jitter Histogram (`ax::telemetry`):** Mapped 64B-aligned `ax::TelemetryCounters` into `Local\AX_Telemetry` (Windows) and `/dev/shm/ax_telemetry` (Linux) with lock-free `min / P99 / max` microsecond audio callback histograms (`ax::RecordAudioCallbackMetrics`), wired into `Eden` (`sink_stream.cpp`, `flex_asio_manager.cpp`) and `FLAC_AX` (`src/main.cpp`).
+* **2.12 Unified Runtime Configuration (`ax::config` & `ax_engine.ini`):** Added zero-dependency `ax_engine.ini` parsing (`ax::LoadEngineConfig`) and standardized ISA/platform macros (`AX_PLATFORM_WINDOWS`, `AX_PLATFORM_LINUX`, `AX_HAS_AVX2`, `AX_HAS_BMI1`).
+* **2.13 5-Repository Boundary & Shared Tooling (`ax-sdk/tools/` & `Scripts\resolve_ax_tools.bat`):** Onboarded `FLAC_AX` as the 5th ecosystem repository, added `cemu-latte-ax` Buildroot recipes (`Config.in`, `cemu-latte-ax.mk`) to `Piccolo-AX`, and consolidated all shared host auditing/telemetry/purge scripts into `ax-sdk/tools/` + `ax_doctor.sh`.
 ---
 
 ## 🔄 Piccolo Sprint-to-Master Release Crosswalk (`v1.35.0` – `v2.00`)

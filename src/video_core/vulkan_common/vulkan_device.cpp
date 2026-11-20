@@ -584,7 +584,11 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR 
 
     if (is_nvidia) {
         const auto arch = GetNvidiaArch();
-        if (arch >= NvidiaArchitecture::Arch_AmpereOrNewer) {
+        if (arch == NvidiaArchitecture::Arch_Maxwell) {
+            LOG_INFO(Render_Vulkan,
+                     "Maxwell GM200 detected: promoting FP16 shader math to native FP32");
+            features.shader_float16_int8.shaderFloat16 = false;
+        } else if (arch >= NvidiaArchitecture::Arch_AmpereOrNewer) {
             LOG_WARNING(Render_Vulkan, "Ampere and newer have broken float16 math");
             features.shader_float16_int8.shaderFloat16 = false;
         }

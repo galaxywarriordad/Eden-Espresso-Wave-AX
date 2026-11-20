@@ -391,12 +391,20 @@ endif()
 AddJsonPackage(nlohmann)
 
 # =======================================================================
-# AX-SDK (Shared C++20 Silicon Core & Topology)
+# AX-SDK (Shared C++20 Silicon Core, Settings, Telemetry & Tools)
 # =======================================================================
+if(NOT DEFINED FETCHCONTENT_SOURCE_DIR_AX_SDK)
+    if(DEFINED ENV{AX_SDK_DIR} AND EXISTS "$ENV{AX_SDK_DIR}/CMakeLists.txt")
+        set(FETCHCONTENT_SOURCE_DIR_AX_SDK "$ENV{AX_SDK_DIR}" CACHE PATH "" FORCE)
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ax-sdk/CMakeLists.txt")
+        set(FETCHCONTENT_SOURCE_DIR_AX_SDK "${CMAKE_CURRENT_SOURCE_DIR}/../ax-sdk" CACHE PATH "" FORCE)
+    endif()
+endif()
+
 FetchContent_Declare(
     ax_sdk
     GIT_REPOSITORY https://github.com/galaxywarriordad/ax-sdk.git
-    GIT_TAG        v1_35_0
+    GIT_TAG        v1_36_1
     # CMake 4.x defaults GIT_SHALLOW to TRUE for tag-like refs (--depth 1), which omits
     # annotated GitHub release tags from the shallow packfile and breaks tag checkout.
     GIT_SHALLOW    FALSE
@@ -617,7 +625,7 @@ add_subdirectory(src)
 
 if (TARGET core AND TARGET ax::core)
     target_link_libraries(core PRIVATE ax::core)
-    message(STATUS "[AX-SDK] Linked ax::core (v1.35.0) into core engine target.")
+    message(STATUS "[AX-SDK] Linked ax::core (v1.35.1) into core engine target.")
 endif()
 
 if (ENABLE_DEBUG_TOOLS)

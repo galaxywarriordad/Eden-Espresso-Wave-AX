@@ -72,7 +72,7 @@ To share a single deterministic silicon parser across Eden Espresso Wave [AX], E
 File Footprint: ax-sdk/include/ax/topology.hpp & ax-sdk/src/topology.cpp
 ```cpp
 // ax-sdk/src/topology.cpp — Cross-Platform Physical P-Core / SMT 2:3:1 Resolver
-void BuildProportionalMasks(const std::vector& cores,
+void BuildProportionalMasks(const std::vector<CpuInfo>& cores,
 SiliconProfile& profile) noexcept {
 if (cores.empty()) {
 return; // Retain safe 6-core defaults (0x01, 0x02, 0x1C, 0x20)
@@ -87,7 +87,7 @@ return (cpu < 64U) ? (1ULL << cpu) : 0ULL;
 //   1 dedicated core  -> VulkanSubmission (Core 1)
 //   ~50% of cores     -> GuestJit (min 2 cores, 3 on 6-core i5-9600K)
 //   remaining cores   -> Housekeeping / Async VRAM Reaper / SPIR-V / HID
-const std::size_t jit_count = std::clampstd::size_t(n / 2, 2, n - 3);
+const std::size_t jit_count = std::clamp<std::size_t>(n / 2, 2, n - 3);
 const std::size_t jit_end = 2 + jit_count;
 profile.audio_mask = bit_for(0);
 profile.vulkan_mask = bit_for(1);
@@ -151,4 +151,4 @@ To systematically eliminate these structural vulnerabilities without introducing
 
 #### 📦 Phase 2: AMD CCX Cache-Line Realignment (Target: `v1.35` / Sprint 2)
 * **Deployment Window:** Mid-`v1.35`. Implement immediately following the formal sign-off and stability verification of the Intel SMT shims.
-* **Integration Justification:** AMD's modular CCD/CCX design introduces additional architectural variables, requiring deep query loops against `RelationCache` indices to properly parse L3 cache associations. Isolating this update to Sprint 2 keeps our debugging variables separated and prevents cache-line thrashing issues from muddying the core pipeline transition[cite: 21].
+* **Integration Justification:** AMD's modular CCD/CCX design introduces additional architectural variables, requiring deep query loops against `RelationCache` indices to properly parse L3 cache associations. Isolating this update to Sprint 2 keeps our debugging variables separated and prevents cache-line thrashing issues from muddying the core pipeline transition.

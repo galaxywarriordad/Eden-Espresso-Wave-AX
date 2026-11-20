@@ -11,6 +11,18 @@ All notable changes, silicon-tuning milestones, and compiler fixes for **Eden Es
 * **Phase 5 (Closed-Loop Runtime & Dev-Kit Polish):** Predictive NVMe pre-faulting, frame-pacing governor, Maxwell register-pressure guards, Core 5 RawInput polling, and external USB-C telemetry screen support.
 * **Phase 6 (Autonomous Silicon R&D):** Live background ARM64 superblock re-compilation on Core 5, Intel VME motion vector synthesis, and hardware VBLANK/audio sync dongles.
 
+## [v1.35.1] — 2026-11-20 (`ax-sdk` `v1_36_1` Shared-Memory Telemetry, Audio Jitter Profiler & Aggregated `tools/` Delegation)
+### Added
+* **Cross-Process Shared-Memory Telemetry & Audio Jitter Profiler (`ax-sdk` `v1_36_1`):** Linked `ax::core` into `audio_core` (`src/audio_core/CMakeLists.txt`), mapped `Local\AX_Telemetry` / `/dev/shm/ax_telemetry` in `FlexASIOManager::ProvisionLocalConfiguration()`, and instrumented `SinkStream::ProcessAudioOutAndRender()` with `ax::RecordAudioCallbackMetrics()` (`min / P99 / max us` callback latency) and `audio_underruns` / `audio_buffer_switches` counters.
+* **Shared Tooling Locator (`Scripts\resolve_ax_tools.bat`):** Added automatic resolution of `%AX_TOOLS_DIR%` across `%AX_SDK_DIR%\tools`, sibling `..\ax-sdk\tools`, and CMake `FetchContent` caches.
+
+### Changed
+* **Aggregated Host Tooling Delegation (`PGO_config.bat` & `Scripts\PGO_stage*.bat`):** Removed duplicated local `.ps1` host scripts from `Scripts\` and delegated `Get-AxProfile.ps1`, `check_hardware.ps1`, `set_irq_affinity.ps1 -Revert`, `track_telemetry.ps1`, `check_regression.ps1`, and synchronous `clean_all.ps1 -Wait` directly to `ax-sdk/tools/`.
+* **Unified Configuration (`ax_engine.ini`):** Migrated `eden_engine.ini` references to `ax_engine.ini` (`ax::LoadEngineConfig()`) across `FlexASIOManager` and PGO staging scripts.
+
+### Fixed
+* **PowerShell `Add-Type` Window Positioning (`Scripts\PGO_stage0.bat`, `PGO_stage0LD.bat`, `PGO_stage1.bat`):** Replaced `-TypeDefinition` with `-MemberDefinition` alongside `-Name WWindowUtil -Namespace Win32` to eliminate the `AmbiguousParameterSet` startup warning.
+
 ---
 
 ## [v1.35] — 2026-11-19 (Proactive `5.00 GiB` Async Vulkan 1.4 VRAM Shield & `ax-sdk` Core Integration)
@@ -74,4 +86,4 @@ All notable changes, silicon-tuning milestones, and compiler fixes for **Eden Es
 * Initial 3-stage LLVM PGO scripts (`PGO_stage1.bat`, `PGO_stage2.bat`) with automated forward-slash path escaping, 32-byte heap over-alignment, and MSVC STL vector-annotation guards.
 
 ### Fixed
-* **Compiler & Audio Fixes:** Refactored `LAMBDA_FORCEINLINE` macros for strict Clang-cl rules, scrubbed C-flags in CMake, and resolved POSIX `getopt_long` null-pointer constants in `yuzu_room.cpp`[cite: 17].
+* **Compiler & Audio Fixes:** Refactored `LAMBDA_FORCEINLINE` macros for strict Clang-cl rules, scrubbed C-flags in CMake, and resolved POSIX `getopt_long` null-pointer constants in `yuzu_room.cpp`.

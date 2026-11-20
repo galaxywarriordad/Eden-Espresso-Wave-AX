@@ -50,26 +50,25 @@ To elevate `[AX]` from a fragile hardware-specific fork into a robust, high-perf
  (Removes Static Bitmask Traps)        (Decouples VRAM from VBLANK)      (Hardens Bare-Metal CI/CD Gates)
 ```
 
-### Phase A: Dynamic SMT-Aware Topology Resolution (`[RESOLVED in ax-sdk v1.35.0]`)
+### Phase A: Dynamic SMT-Aware Topology & Unified Settings (`[RESOLVED in ax-sdk v1.35.0 → v1_36_1]`)
 
 To eliminate the SMT pipeline stall hazard, hardcoded affinity bitmasks have been replaced by a cross-platform hardware topology resolver inside **`ax-sdk/src/topology.cpp`** (`ax::topology::DetectHostSilicon()`):
 
 1. **Logical Thread Extraction:** Query host CPU characteristics using `std::thread::hardware_concurrency()` and platform-specific OS registers (`GetLogicalProcessorInformationEx` on Windows; `sysfs` node structures on Linux) to identify physical core boundaries.
 2. **SMT Filtering Matrix:** If Hyper-Threading/SMT is detected at boot time, the engine must mask out secondary logical buddy threads. Workloads must be mapped strictly across primary physical execution units (e.g., routing JIT threads exclusively to even logical indices: `0, 2, 4, 6`).
-3. **Proportional Core Scaler Implementation:** Complete Backlog Activity 5.6. Read an abstract ratio configuration from `eden_engine.ini` (e.g., `CoreRatio=2:3:1`) and generate runtime affinity bitmasks dynamically on boot, allowing the system to scale fluidly from a 6-core processor up to a 16-core configuration.
+3. **Proportional Core Scaler & Unified Settings:** Reads `CoreRatio=2:3:1` from `ax_engine.ini` (`ax::LoadEngineConfig()`) alongside declarative silicon profiles in `ax-sdk/config/hardware_profiles.json` (`schema_version: 2.1`) to generate runtime affinity bitmasks dynamically on boot across 6-core through 16-core processors.
 
-### Phase B: Asynchronous `5.00 GiB` VRAM Shield & Vulkan 1.4 Split Barriers (`[RESOLVED in Master v1.35]`)
-
+3. **Asynchronous Split-Barrier Pruning:** Use fine-grained Vulkan split barriers (`vkCmdSetEvent2KHR` and `vkCmdWaitEvents2KHR`) to query, track, and prune stale texture cache layers continuously in the background. This ensures that memory spikes are ironed out cleanly without invading or reducing the frame time safety window.
 To remove memory compaction stalls from the critical display path, eviction routines have been decoupled from the synchronous VBLANK execution block via **`ax-sdk/include/ax/vram.hpp`** (`kPruneTriggerBytes = 5.00 GiB`) and **`src/video_core/renderer_vulkan/vk_vram_shield.hpp`** (`VK_QUEUE_TRANSFER_BIT` + Vulkan 1.4 `vkCmdSetEvent2`/`vkCmdWaitEvents2` split barriers + Core 5 `VK_KHR_timeline_semaphore` reaper):
 
 1. **VRAM Budget Offloading:** Shift the 10% cache eviction loop (`EvictStaleCacheStructures`) completely out of the synchronous display tick pass.
 2. **Dedicated Transfer Queue Binding:** Connect the memory compaction subsystem directly to an independent background Vulkan transfer queue utilizing `VK_QUEUE_TRANSFER_BIT`.
 3. **Asynchronous Split-Barrier Pruning:** Use fine-grained Vulkan split barriers (`vkCmdSetEvent2KHR` and `vkCmdWaitEvents2KHR`) to query, track, and prune stale texture cache layers continuously in the background. This ensures that memory spikes are ironed out cleanly without invading or reducing the frame time safety window.
 
-### Phase C: Localized Hardware Testing & Branch Protection (Target: Sprint 5 / `v1.37`)
+### Phase C: Localized Hardware Testing & Branch Protection (`[TOOLING READY in ax-sdk v1_36_1 — Runner Queued for v1.37]`)
 
 To prevent unvalidated code configurations from breaking bare-metal performance baselines, your testing infrastructure must be decoupled from generic virtual cloud runners:
 
 1. **Deploy Local Self-Hosted Testing Agents:** Discontinue running hardware-dependent affinity validations on virtualized GitHub/Forgejo cloud environments. Configure a local, bare-metal self-hosted testing runner matching your reference silicon profile (Intel Coffee Lake + discrete GPU + dedicated USB DAC endpoint).
 2. **Enforce Strict Remote Branch Protection:** Enable branch protection rules on your upstream Forgejo server repository to completely block direct pushes to the `master` branch. Require all developer modifications to pass through explicit feature branch tracks (`feature/*`).
-3. **Mandatory Pass Gates:** Configure the server repository to reject pull requests unless your local testing agent successfully returns a verified pass code (`SPRINT_0_GATE_RESULT=PASS`) from `Scripts\run_sprint0_hardware_gate.ps1`. This guarantees that code changes are fully validated on physical hardware before merging into the main deployment stream[cite: 24].
+3. **Mandatory Pass Gates:** Configure the server repository to reject pull requests unless your local testing agent passes `ax-sdk/tools/check_hardware.ps1` and `ax-sdk/tools/check_regression.ps1` (Windows) or `ax-sdk/tools/ax_doctor.sh` (Piccolo Linux) with exit code `0` before merging into `master`.

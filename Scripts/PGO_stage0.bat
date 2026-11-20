@@ -9,7 +9,7 @@ for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "Add-Type -AssemblyName System.Windows.Forms;" ^
     "$w_code = '[DllImport(\"user32.dll\")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);';" ^
-    "Add-Type -TypeDefinition $w_code -Name WWindowUtil -Namespace Win32 >$null;" ^
+    "Add-Type -MemberDefinition $w_code -Name WWindowUtil -Namespace Win32 >$null;" ^
     "Start-Sleep -Milliseconds 150;" ^
     "$h = (Get-Process -Id $PID).MainWindowHandle;" ^
     "if ($h -ne [IntPtr]::Zero) {" ^
@@ -22,6 +22,9 @@ set "SCRIPT_DIR=%~dp0"
 for %%i in ("%SCRIPT_DIR%..") do set "PROJ_DIR=%%~fi"
 if "%PROJ_DIR:~-1%"=="\" set "PROJ_DIR=%PROJ_DIR:~0,-1%"
 set "LLVM_PROJ_DIR=%PROJ_DIR:\=/%"
+
+call "%SCRIPT_DIR%resolve_ax_tools.bat"
+if !errorlevel! neq 0 exit /b 1
 
 set "VSCMD_ARG_TGT_ARCH=x64"
 set "VSCMD_ARG_HOST_ARCH=x64"
@@ -44,16 +47,16 @@ set "PATH=C:\Program Files\CMake\bin;C:\Program Files\LLVM\bin;C:\Program Files\
 set "QT_ENABLE_HIGHDPI_SCALING=1"
 set "QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough"
 
-set "BASE_GAME_DIR=J:\Switch"
-set "SSD_STAGING_DIR=E:\updates"
+if not defined BASE_GAME_DIR set "BASE_GAME_DIR=J:\Switch"
+if not defined SSD_STAGING_DIR set "SSD_STAGING_DIR=E:\updates"
 echo [STATUS] Evaluating dual-storage target path layouts...
-if not exist "%BASE_GAME_DIR%" echo [@=FATAL] MECHANICAL TARGET DIRECTORY UNREACHABLE - DRIVE MOUNT MISSING. & exit /b 1
+if not exist "%BASE_GAME_DIR%" echo [WARN] Mechanical archive directory (%BASE_GAME_DIR%) not mounted - continuing build.
 if not exist "%SSD_STAGING_DIR%" mkdir "%SSD_STAGING_DIR%" 2>nul
 
 cd /d "%PROJ_DIR%"
 
 echo [STATUS] Verifying host hardware topology compliance...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%check_hardware.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%AX_TOOLS_DIR%\check_hardware.ps1" -TargetApp eden -RepoRoot "%PROJ_DIR%"
 if !errorlevel! neq 0 (
     set "HW_ERR=!errorlevel!"
     echo [@=FATAL] HARDWARE COMPLIANCE FIREWALL REJECTED HOST TOPOLOGY.
@@ -86,7 +89,7 @@ echo                      ^(   ^(   ^(
 echo                       ^)   ^)   ^)             PGO Phase 0 ^(High-Velocity Production Mode^)
 echo                  ._________________.
 echo                 /  ###############  \         --------------------------------------------
-echo                /   ###############   \---\      === Eden ESPRESSO WAVE [AX] v1.3 ===
+echo                /   ###############   \---\      === Eden ESPRESSO WAVE [AX] v1.35 ===
 echo               /    ###############    \   \   --------------------------------------------
 echo              /     ###############     /  /   CPU: Intel 9600k Coffee Lake Baseline ^(Skylake ISA^)
 echo              \     ###############    /  /    GPU: NVIDIA Maxwell GTX 980Ti
@@ -139,6 +142,7 @@ for /f "tokens=*" %%l in ('findstr /r /c:"^\[[0-9]*/[0-9]*\]" "%NINJA_OUT%"') do
 if defined LAST_NINJA_STEP echo Final Ninja Step     : !LAST_NINJA_STEP! >> "%SUMMARY_LOG%"
 del /q "%NINJA_OUT%" >nul 2>&1
 
+if exist "%PROJ_DIR%\ax_engine.ini" copy /Y "%PROJ_DIR%\ax_engine.ini" "%BUILD_DIR%\bin\ax_engine.ini" >nul
 if exist "%PROJ_DIR%\eden_engine.ini" copy /Y "%PROJ_DIR%\eden_engine.ini" "%BUILD_DIR%\bin\eden_engine.ini" >nul
 if exist "%PROJ_DIR%\src\audio_core\FlexASIO.toml" copy /Y "%PROJ_DIR%\src\audio_core\FlexASIO.toml" "%BUILD_DIR%\bin\FlexASIO.toml" >nul
 

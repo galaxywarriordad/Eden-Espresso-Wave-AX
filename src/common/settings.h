@@ -149,10 +149,10 @@ struct Values {
     Setting<AppletMode> net_connect_applet_mode{linkage, AppletMode::LLE, "net_connect_applet_mode",
                                                 Category::LibraryApplet};
     SwitchableSetting<AppletMode> player_select_applet_mode{
-                                                  linkage, AppletMode::LLE, "player_select_applet_mode", Category::LibraryApplet};
+                                                  linkage, AppletMode::HLE, "player_select_applet_mode", Category::LibraryApplet};
     SwitchableSetting<AppletMode> swkbd_applet_mode{linkage, AppletMode::HLE, "swkbd_applet_mode",
                                           Category::LibraryApplet};
-    SwitchableSetting<AppletMode> mii_edit_applet_mode{linkage, AppletMode::LLE, "mii_edit_applet_mode",
+    SwitchableSetting<AppletMode> mii_edit_applet_mode{linkage, AppletMode::HLE, "mii_edit_applet_mode",
                                              Category::LibraryApplet};
     SwitchableSetting<AppletMode> web_applet_mode{linkage, AppletMode::HLE, "web_applet_mode",
                                         Category::LibraryApplet};

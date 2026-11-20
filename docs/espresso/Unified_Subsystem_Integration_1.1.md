@@ -129,7 +129,9 @@ jobs:
       - name: Execute Master Hardware Gate Validation Suite
         shell: pwsh
         run: |
-          & ".\Scripts\run_sprint0_hardware_gate.ps1"
+          & ".\ax-sdk\tools\check_hardware.ps1"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & ".\ax-sdk\tools\check_regression.ps1"
           if ($LASTEXITCODE -ne 0) {
               Write-Error "[FAIL] Master Hardware Gate sequence failed. Blocking deployment pipeline integration layers."
               exit 1
@@ -147,10 +149,10 @@ jobs:
           retention-days: 7
 ```
 
-#### File Footprint: `Scripts\run_sprint0_hardware_gate.ps1`
+#### File Footprint: `ax-sdk\tools\check_hardware.ps1` & `check_regression.ps1`
 
 ```powershell
-# Scripts\run_sprint0_hardware_gate.ps1 — Sprint 0 Automated Verification Master Suite
+# ax-sdk\tools\check_hardware.ps1 & check_regression.ps1 — Sprint 0 Automated Verification Master Suite
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -975,4 +977,4 @@ By combining the Architectural Plan with the Engineering Backlog Release Gates, 
 
 ### 3. VBLANK Presentation & Latency Cascade
 * **Backlog Requirement:** Poll budget parameters inside quiet windows to flush stale targets within VBLANK.
-* **Plan Implementation:** Step 2 (`vk_rasterizer.cpp`) intercepts execution during the exact VBLANK sync window. It samples memory metrics via `InterceptAndPruneVRAM` before fragment evaluation passes, automatically deploying the 10% cache eviction loop and the LOD quality downscale overrides if the allocation budget is breached[cite: 24].
+* **Plan Implementation:** Step 2 (`vk_rasterizer.cpp`) intercepts execution during the exact VBLANK sync window. It samples memory metrics via `InterceptAndPruneVRAM` before fragment evaluation passes, automatically deploying the 10% cache eviction loop and the LOD quality downscale overrides if the allocation budget is breached.
