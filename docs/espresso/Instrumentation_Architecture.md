@@ -16,7 +16,7 @@
 
 Emulating complex console architectures on commodity desktop hardware—specifically an asymmetrical core topology (Intel i5-9600K) paired with a discrete Maxwell GPU (NVIDIA GTX 980 Ti)—presents formidable observability challenges. Traditional developer tools, such as external third-party overlays (e.g., RTSS, MangoHud) or heavyweight profilers, introduce measurable polling overhead, thread contention, and micro-stutters that distort the very metrics they attempt to measure. Furthermore, they lack domain-specific awareness of guest JIT compilation loops, Vulkan command buffer submission latencies, and audio subsystem buffer health.
 
-To overcome these limitations, the **Eden Espresso Wave [AX]** initiative set out to integrate a production-grade, non-stuttering, native Vulkan On-Screen Display (OSD) and hardware telemetry subsystem directly into the engine's core render loop (`telemetry_osd.cpp`). By marrying native OS memory polling, hardware-accelerated Vulkan query pools, strict asymmetrical thread pinning, and a multi-stage Profile-Guided Optimization (PGO) pipeline, Eden achieves console-parity observability—bridging the gap between open-source emulation and professional console development kits like Microsoft PIX or the PlayStation Performance Analyzer.
+To overcome these limitations, the **Eden Espresso Wave [AX]** initiative set out to integrate a production-grade, non-stuttering, native Vulkan On-Screen Display (OSD) and hardware telemetry subsystem directly into the engine's core render loop (`telemetry_osd.cpp`). By marrying native OS memory polling, hardware-accelerated Vulkan query pools, strict asymmetrical thread pinning, cross-process shared-memory export (`ax-sdk` `v1_36_1`), and a multi-stage Profile-Guided Optimization (PGO) pipeline, Eden achieves console-parity observability—bridging the gap between open-source emulation and professional console development kits like Microsoft PIX or the PlayStation Performance Analyzer.
 
 ---
 
@@ -27,10 +27,10 @@ The deployed telemetry and instrumentation stack is built upon several tightly i
 ### 2.1 Elastic Core Topology (`2:3:1`) & Thread Affinity
 To prevent context-switching jitter and cache thrashing, Eden enforces strict thread affinity across the Intel i5-9600K's 6 physical cores:
 
-* **Core 0 (`0x01`):** Dedicated to the Audio Render System Manager and HiBy FC3 ASIO ring buffer, ensuring zero audio underruns.
+* **Core 0 (`0x01`):** Dedicated to the Audio Render System Manager and HiBy FC3 ASIO / ALSA ring buffer (`ax::audio::LockFreeStereoRing`), ensuring zero audio underruns.
 * **Core 1 (`0x02`):** Dedicated Vulkan Worker handling command buffer dispatch and primary graphics submission.
 * **Cores 2–4 (`0x1C`):** Allocated to guest JIT execution fibers and CPU emulation loops.
-* **Core 5 (`0x20`):** Dedicated to the QSV Video Feeder, FFmpeg decode fallback worker pool (`execute2`), and background SPIR-V compilation tasks.
+* **Core 5 (`0x20`):** Dedicated to the QSV / VA-API Video Feeder, FFmpeg decode fallback worker pool (`execute2`), and background SPIR-V compilation tasks.
 
 ### 2.2 Native Vulkan Query Pools & Pipeline Statistics
 Rather than estimating GPU workload via blunt high-level timers, Eden leverages native Vulkan query pools configured with `VK_QUERY_TYPE_PIPELINE_STATISTICS` (`telemetry_osd.cpp`):
@@ -77,7 +77,10 @@ Eden utilizes a rigorous 3-stage PGO build pipeline to linearize hot-path code b
 
 * **Stage 0LD (`PGO_stage0LD.bat`):** Compiles the modified baseline code and verifies basic telemetry and thread affinities.
 * **Stage 1 (`PGO_stage1.bat`):** Builds an instrumented binary and executes standardized 15-minute training sweeps across base (`v0`) test titles while tracking runtime telemetry.
-* **Stage 2 (`PGO_stage2.bat`):** Merges profiling data (`.pgc`) and compiles the final, L1i-linearized high-performance production binary.
+* **Stage 2 (`PGO_stage2.bat`):** Merges profiling data (`.pgc` / `.profraw` → `default.profdata`) via `Scripts\validate_profile.ps1` and compiles the final, L1i-linearized high-performance production binary.
+
+### 2.6 Cross-Process Shared-Memory Export (`ax::telemetry` `v1_36_1`)
+In addition to rendering the in-swapchain Vulkan OSD, `telemetry_osd.cpp` exports 64-byte cache-line-aligned atomic counters (`ax::TelemetryCounters`) to `Local\AX_Telemetry` (Windows) and `/dev/shm/ax_telemetry` (Linux) via `ax::InitTelemetryShm()`—allowing out-of-process monitors (`ax-sdk/tools/track_telemetry.ps1` and `ax-top`) to inspect GPU pipeline statistics, VRAM shield headroom (`5.00 GiB` prune / `5.50 GiB` ceiling), and `min / P99 / max` microsecond audio callback jitter (`ax::RecordAudioCallbackMetrics`) across `Eden`, `Cemu`, `Generation-X-AX`, and `FLAC_AX` with zero IPC locks.
 
 ---
 
@@ -87,9 +90,9 @@ To push Eden from advanced emulation instrumentation into absolute elite industr
 
 * **3.1 Vendor-Specific VRAM & Bus Saturation Profiling (NVIDIA NVAPI / ADL)**
   * *Objective:* Bypass generic OS memory counters to poll true physical VRAM allocation, memory bus bandwidth utilization, and L2 cache hit/miss rates directly from the Maxwell GTX 980 Ti hardware performance registers.
-* **3.2 Automated Headless PGO Training Loops (`PGO_automated_sweep.py`)**
-  * *Objective:* Script the execution of multi-title training sweeps with automated profile merging and regression checking, eliminating manual batch file staging errors and accelerating the iteration cycle.
+* **3.2 Telemetry-Guided PGO Training Sweeps (`PGO_automated_sweep.py` / `ax::telemetry`)**
+  * *Objective:* Gate Stage 1 LLVM `-fprofile-generate` instrumentation (`__llvm_profile_reset_counters()` / `__llvm_profile_dump()`) using live Vulkan pipeline statistics (`VK_QUERY_TYPE_PIPELINE_STATISTICS`) and `Local\AX_Telemetry` gameplay-state flags—excluding cold menu/loading screens so `default.profdata` linearizes only genuine 60/120 FPS gameplay, Vulkan submission, and audio hot paths across `Eden`, `Cemu`, `Generation-X-AX`, and `FLAC_AX`.
 * **3.3 Asynchronous Telemetry Stream (JSON / CSV Ring-Buffer Dumps)**
   * *Objective:* Implement a zero-cost background ring-buffer serializer that flushes historical telemetry snapshots (frame-time variance, JIT spikes, core execution times) to disk upon session termination for automated regression graphing and performance tracking.
 * **3.4 JIT Compaction & Cache Fragmentation Metrics**
-  * *Objective:* Introduce real-time tracking for JIT allocation pools, translation latency per instruction block, and code cache eviction rates to instantly detect and eliminate micro-stutters during intensive shader compilation phases[cite: 26].
+  * *Objective:* Introduce real-time tracking for JIT allocation pools, translation latency per instruction block, and code cache eviction rates to instantly detect and eliminate micro-stutters during intensive shader compilation phases.
