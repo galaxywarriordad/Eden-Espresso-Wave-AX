@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+# SPDX-FileCopyrightText: Copyright 2026 Eden Espresso Wave [AX] / Eden Emulator Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 cmake_minimum_required(VERSION 3.31)
@@ -74,7 +74,7 @@ endif()
 option(ENABLE_QT "Enable the Qt frontend" ON)
 option(ENABLE_QT_TRANSLATION "Enable translations for the Qt frontend" OFF)
 option(ENABLE_UPDATE_CHECKER "Enable update checker (for Qt and Android)" OFF)
-cmake_dependent_option(YUZU_USE_QT_MULTIMEDIA "Use QtMultimedia for Camera"  OFF "NOT YUZU_USE_BUNDLED_QT" OFF)
+cmake_dependent_option(YUZU_USE_QT_MULTIMEDIA "Use QtMultimedia for Camera" OFF "NOT YUZU_USE_BUNDLED_QT" OFF)
 cmake_dependent_option(YUZU_USE_QT_WEB_ENGINE "Use QtWebEngine for web applet implementation" OFF "NOT YUZU_USE_BUNDLED_QT" OFF)
 set(YUZU_QT_MIRROR "" CACHE STRING "What mirror to use for downloading the bundled Qt libraries")
 cmake_dependent_option(YUZU_USE_BUNDLED_QT "Download bundled Qt binaries" "${MSVC}" "ENABLE_QT" OFF)
@@ -242,7 +242,7 @@ cmake_dependent_option(YUZU_USE_BUNDLED_MOLTENVK "Download bundled MoltenVK lib"
 
 option(YUZU_DISABLE_LLVM "Disable LLVM (useful for CI)" OFF)
 
-if (WIN32)
+if (WIN32 AND EXISTS "C:/Program Files/LLVM")
     set(LLVM_DIR "C:/Program Files/LLVM" CACHE PATH "Path to standalone LLVM installation")
     message(STATUS "[LLVM FACTORY] Standard link maps bound to host path: ${LLVM_DIR}")
 endif()
@@ -407,7 +407,7 @@ endif()
 FetchContent_Declare(
     ax_sdk
     GIT_REPOSITORY https://github.com/galaxywarriordad/ax-sdk.git
-    GIT_TAG        v1_36_1
+    GIT_TAG        v1_36_2
     GIT_SHALLOW    FALSE
 )
 FetchContent_MakeAvailable(ax_sdk)
@@ -599,10 +599,10 @@ endif()
 # INJECTION POINT 3: MSVC STL COMPATIBILITY & AUDIO VECTORIZATION LOCK
 # =======================================================================
 if (MSVC AND CXX_CLANG)
-    add_compile_options("/D_DISABLE_VECTOR_ANNOTATION")
-    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION)
+    add_compile_options("/D_DISABLE_VECTOR_ANNOTATION" "/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH=1")
+    add_compile_definitions(_DISABLE_VECTOR_ANNOTATION _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH=1)
     add_compile_options("/bigobj")
-    message(STATUS "[GLOBAL STL FIX] Hard-enforced MSVC find-vectorizer bypass across all engine targets.")
+    message(STATUS "[GLOBAL STL FIX] Hard-enforced MSVC STL version & find-vectorizer bypass across all engine targets.")
 
     set(OPUS_TARGET_VARIATIONS "opus" "externals::opus" "bundled_libopus" "audio_core")
     foreach(_opus_target IN LISTS OPUS_TARGET_VARIATIONS)
@@ -625,7 +625,7 @@ add_subdirectory(src)
 
 if (TARGET core AND TARGET ax::core)
     target_link_libraries(core PRIVATE ax::core)
-    message(STATUS "[AX-SDK] Linked ax::core (v1_36_1) into core engine target.")
+    message(STATUS "[AX-SDK] Linked ax::core (v1_36_2) into core engine target.")
 endif()
 
 if (ENABLE_DEBUG_TOOLS)
