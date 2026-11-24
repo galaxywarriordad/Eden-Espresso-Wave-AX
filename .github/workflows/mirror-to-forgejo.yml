@@ -1,0 +1,23 @@
+name: Mirror to Forgejo
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Forgejo
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+        run: |
+          git remote add forgejo "https://galaxywarriordad:${FORGEJO_TOKEN}@git.eden-emu.dev/galaxywarriordad/${{ github.event.repository.name }}.git"
+          git push --force forgejo "HEAD:refs/heads/${{ github.ref_name }}"
