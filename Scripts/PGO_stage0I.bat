@@ -31,7 +31,7 @@ if not exist "%~dp0..\build_stage0\build.ninja" (
 
 set "LOG_FILE=%~dp0..\build_stage0_incremental.log"
 echo [STATUS] Compiling modified C++20 targets via Ninja (-j 4)...
-ninja -C "%~dp0..\build_stage0" -j 4 yuzu > "%LOG_FILE%" 2>&1
+ninja -C "%~dp0..\build_stage0" -j 4 eden > "%LOG_FILE%" 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [@=FATAL] Incremental build failed. Check %LOG_FILE% for diagnostics.
     type "%LOG_FILE%"

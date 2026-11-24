@@ -82,7 +82,7 @@ cmake_dependent_option(YUZU_USE_BUNDLED_QT "Download bundled Qt binaries" "${MSV
 option(ENABLE_DEBUG_TOOLS "Enable debugging tools (maxwell disassembler, SPIRV translator, etc)" OFF)
 option(ENABLE_WERROR "Enable -Werror diagnostics" ON)
 
-cmake_dependent_option(ENABLE_LSFG "Enable Lossless Scaling frame generation" ON "ANDROID" OFF)
+option(ENABLE_LSFG "Enable Lossless Scaling frame generation" ON)
 option(ENABLE_RESHADE "Enable ReShade FX post-processing effects" ON)
 
 if (YUZU_USE_BUNDLED_QT AND (APPLE OR NOT UNIX))
@@ -151,13 +151,13 @@ if (CXX_CLANG_CL)
         $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-c++98-compat>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-c99-compat>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-error=all>
-        $<$<COMPILE_LANGUAGE:C,CXX>:/EHsc>)
-        
+        $<$<COMPILE_LANGUAGE:C,CXX>:/EHsc>
+    )
+
     if (ARCHITECTURE_x86_64)
         add_compile_options(
             $<$<COMPILE_LANGUAGE:C,CXX>:-msse4.1>
             $<$<COMPILE_LANGUAGE:C,CXX>:-mcx16>
-            
             # =======================================================================
             # HARDWARE INSTRUCTION BASELINE LOCK (Core i5-9600K Optimization Matrix)
             # =======================================================================
@@ -196,7 +196,7 @@ if(MSVC)
     # =======================================================================
     # INJECTION POINT 1: Global Linker Isolation Defenses for Standalone PGO
     # =======================================================================
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE 
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE
         "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:libcmt.lib /ALLOWISOLATION"
     )
     message(STATUS "[GLOBAL LINKER OVERRIDE] Enforced release runtime library isolation limits successfully.")
@@ -243,7 +243,6 @@ cmake_dependent_option(YUZU_USE_BUNDLED_MOLTENVK "Download bundled MoltenVK lib"
 option(YUZU_DISABLE_LLVM "Disable LLVM (useful for CI)" OFF)
 
 if (WIN32)
-    # Expose the binary path location directly to all sub-modules without calling find_package
     set(LLVM_DIR "C:/Program Files/LLVM" CACHE PATH "Path to standalone LLVM installation")
     message(STATUS "[LLVM FACTORY] Standard link maps bound to host path: ${LLVM_DIR}")
 endif()
@@ -290,35 +289,39 @@ endif()
 
 if (CXX_GCC OR CXX_CLANG)
     if (ARCHITECTURE_x86_64)
-        set(YUZU_BUILD_PRESET "custom" CACHE STRING "Build preset to use.")
-        if (${YUZU_BUILD_PRESET} STREQUAL "generic")
+        set(YUZU_BUILD_PRESET "skylake" CACHE STRING "Build preset to use.")
+        if ("${YUZU_BUILD_PRESET}" STREQUAL "generic")
             set(march x86-64)
             set(mtune generic)
-        elseif (${YUZU_BUILD_PRESET} STREQUAL "v3")
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "skylake")
+            set(march skylake)
+            set(mtune skylake)
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "v3")
             set(march x86-64-v3)
             set(mtune generic)
-        elseif (${YUZU_BUILD_PRESET} STREQUAL "zen2")
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "zen2")
             set(march znver2)
             set(mtune znver2)
-        elseif (${YUZU_BUILD_PRESET} STREQUAL "zen4")
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "zen4")
             set(march znver4)
             set(mtune znver4)
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "native")
+            set(march native)
+            set(mtune native)
         endif()
     elseif(ARCHITECTURE_arm64)
         set(YUZU_BUILD_PRESET "custom" CACHE STRING "Build preset to use.")
         set(mtune generic)
-        if (${YUZU_BUILD_PRESET} STREQUAL "generic")
+        if ("${YUZU_BUILD_PRESET}" STREQUAL "generic")
             set(march armv8-a)
-        elseif (${YUZU_BUILD_PRESET} STREQUAL "optimized")
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "optimized")
             set(march armv8.2-a+lse+rcpc)
-        elseif (${YUZU_BUILD_PRESET} STREQUAL "armv9")
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "armv9")
             set(march armv9-a)
+        elseif ("${YUZU_BUILD_PRESET}" STREQUAL "native")
+            set(march native)
+            set(mtune native)
         endif()
-    endif()
-
-    if ("${YUZU_BUILD_PRESET}" STREQUAL "native")
-        set(march native)
-        set(mtune native)
     endif()
 
     if (DEFINED march AND DEFINED mtune)
@@ -405,8 +408,6 @@ FetchContent_Declare(
     ax_sdk
     GIT_REPOSITORY https://github.com/galaxywarriordad/ax-sdk.git
     GIT_TAG        v1_36_1
-    # CMake 4.x defaults GIT_SHALLOW to TRUE for tag-like refs (--depth 1), which omits
-    # annotated GitHub release tags from the shallow packfile and breaks tag checkout.
     GIT_SHALLOW    FALSE
 )
 FetchContent_MakeAvailable(ax_sdk)
@@ -452,10 +453,7 @@ if (APPLE)
     endforeach()
 elseif (WIN32)
     add_compile_definitions(_WIN32_WINNT=0x0A00 WINVER=0x0A00)
-    
-    # Fortified Pass: Append native CUDA and Video Codec SDK boundaries to support the new Strategy A matrix
     set(PLATFORM_LIBRARIES ${PLATFORM_LIBRARIES} winmm iphlpapi ws2_32 wlanapi)
-    
     if (MINGW)
         set(PLATFORM_LIBRARIES ${PLATFORM_LIBRARIES} psapi imm32 version crypt32 rpcrt4 gdi32 wldap32 mswsock)
     endif()
@@ -596,13 +594,14 @@ if (MSVC AND CXX_CLANG)
     set_target_properties(llvm-mingw-runtime PROPERTIES IMPORTED_LOCATION "${LIB_PATH}")
     link_libraries(llvm-mingw-runtime)
 endif()
+
 # =======================================================================
 # INJECTION POINT 3: MSVC STL COMPATIBILITY & AUDIO VECTORIZATION LOCK
 # =======================================================================
 if (MSVC AND CXX_CLANG)
     add_compile_options("/D_DISABLE_VECTOR_ANNOTATION")
     add_compile_definitions(_DISABLE_VECTOR_ANNOTATION)
-    add_compile_options("/bigobj") 
+    add_compile_options("/bigobj")
     message(STATUS "[GLOBAL STL FIX] Hard-enforced MSVC find-vectorizer bypass across all engine targets.")
 
     set(OPUS_TARGET_VARIATIONS "opus" "externals::opus" "bundled_libopus" "audio_core")
@@ -621,11 +620,12 @@ if (MSVC AND CXX_CLANG)
     endforeach()
 endif()
 # =======================================================================
+
 add_subdirectory(src)
 
 if (TARGET core AND TARGET ax::core)
     target_link_libraries(core PRIVATE ax::core)
-    message(STATUS "[AX-SDK] Linked ax::core (v1.35.1) into core engine target.")
+    message(STATUS "[AX-SDK] Linked ax::core (v1_36_1) into core engine target.")
 endif()
 
 if (ENABLE_DEBUG_TOOLS)
